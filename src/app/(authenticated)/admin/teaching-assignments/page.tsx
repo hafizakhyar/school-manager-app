@@ -27,6 +27,10 @@ export default function AdminAssignmentsPage() {
   const [subjects, setSubjects] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
+  // Bulk Selection & Sorting States
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
   // Modal states
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -67,6 +71,7 @@ export default function AdminAssignmentsPage() {
       const aList: Assignment[] = [];
       aSnap.forEach(d => aList.push({ id: d.id, ...d.data() } as Assignment));
       setAssignments(aList);
+      setSelectedIds([]); // Reset selection on fetch
     } catch (err) {
       console.error(err);
     } finally {
@@ -77,6 +82,49 @@ export default function AdminAssignmentsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Selection handlers
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(sortedAssignments.map(a => a.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  // Bulk Delete handler
+  const handleBulkDelete = async () => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} penugasan yang dipilih?`)) return;
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach(id => {
+        batch.delete(doc(db, "teachingAssignments", id));
+      });
+      await batch.commit();
+      setSelectedIds([]);
+      await fetchData();
+    } catch (error) {
+      console.error(error);
+      alert("Gagal menghapus penugasan massal!");
+    }
+  };
+
+  // Sorted list based on teacher name A-Z or Z-A
+  const sortedAssignments = [...assignments].sort((a, b) => {
+    const nameA = (teachers[a.teacherId] || a.teacherId).toLowerCase();
+    const nameB = (teachers[b.teacherId] || b.teacherId).toLowerCase();
+    if (sortOrder === "asc") {
+      return nameA.localeCompare(nameB);
+    } else {
+      return nameB.localeCompare(nameA);
+    }
+  });
 
   const handleOpenAdd = () => {
     setIsEditing(false);
@@ -151,7 +199,6 @@ export default function AdminAssignmentsPage() {
       let count = 0;
       let skipped = 0;
 
-      // Format CSV: TeacherID, ClassID, SubjectID
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
@@ -209,7 +256,7 @@ export default function AdminAssignmentsPage() {
             <input type="file" accept=".csv" onChange={handleCsvImport} className="hidden" />
           </label>
 
-          <button onClick={handleOpenAdd} className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500">
+          <button onClick={handleOpenAdd} className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 cursor-pointer">
             <Plus className="h-4.5 w-4.5" />
             <span>Tambah Penugasan</span>
           </button>
@@ -229,6 +276,33 @@ export default function AdminAssignmentsPage() {
         </div>
       )}
 
+      {/* Action Bar (Bulk Actions & Sorting Filter) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {selectedIds.length > 0 ? (
+          <div className="flex items-center gap-3 bg-indigo-950/40 border border-indigo-500/30 px-4 py-2 rounded-xl">
+            <span className="text-xs font-bold text-indigo-300">{selectedIds.length} penugasan dipilih</span>
+            <button
+              onClick={handleBulkDelete}
+              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 transition-colors cursor-pointer"
+            >
+              Hapus Terpilih
+            </button>
+          </div>
+        ) : <div />}
+
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Urutkan:</span>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+            className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 cursor-pointer"
+          >
+            <option value="asc">Nama Guru (A ke Z)</option>
+            <option value="desc">Nama Guru (Z ke A)</option>
+          </select>
+        </div>
+      </div>
+
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(n => <div key={n} className="h-14 w-full animate-pulse rounded bg-slate-900" />)}
@@ -238,6 +312,14 @@ export default function AdminAssignmentsPage() {
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
               <tr>
+                <th className="py-4 px-4 w-12 text-center">
+                  <input
+                    type="checkbox"
+                    checked={sortedAssignments.length > 0 && selectedIds.length === sortedAssignments.length}
+                    onChange={handleSelectAll}
+                    className="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                </th>
                 <th className="py-4 px-4">Nama Guru</th>
                 <th className="py-4 px-4">Mata Pelajaran</th>
                 <th className="py-4 px-4">Kelas</th>
@@ -245,23 +327,37 @@ export default function AdminAssignmentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-900">
-              {assignments.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-900/25 transition-colors">
-                  <td className="py-3.5 px-4 font-semibold text-white">{teachers[a.teacherId] || a.teacherId}</td>
-                  <td className="py-3.5 px-4 text-xs text-indigo-400">{subjects[a.subjectId] || a.subjectId}</td>
-                  <td className="py-3.5 px-4 text-xs text-slate-300">{classes[a.classId] || a.classId}</td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => handleOpenEdit(a)} className="rounded-lg p-1.5 text-slate-400 hover:text-white">
-                        <Pencil className="h-4.5 w-4.5" />
-                      </button>
-                      <button onClick={() => handleDelete(a.id)} className="rounded-lg p-1.5 text-red-500 hover:bg-red-500/10">
-                        <Trash2 className="h-4.5 w-4.5" />
-                      </button>
-                    </div>
-                  </td>
+              {sortedAssignments.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-500 text-xs">Belum ada data penugasan mengajar.</td>
                 </tr>
-              ))}
+              ) : (
+                sortedAssignments.map((a) => (
+                  <tr key={a.id} className="hover:bg-slate-900/25 transition-colors">
+                    <td className="py-3.5 px-4 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(a.id)}
+                        onChange={() => handleSelectOne(a.id)}
+                        className="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-white">{teachers[a.teacherId] || a.teacherId}</td>
+                    <td className="py-3.5 px-4 text-xs text-indigo-400">{subjects[a.subjectId] || a.subjectId}</td>
+                    <td className="py-3.5 px-4 text-xs text-slate-300">{classes[a.classId] || a.classId}</td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => handleOpenEdit(a)} className="rounded-lg p-1.5 text-slate-400 hover:text-white cursor-pointer">
+                          <Pencil className="h-4.5 w-4.5" />
+                        </button>
+                        <button onClick={() => handleDelete(a.id)} className="rounded-lg p-1.5 text-red-500 hover:bg-red-500/10 cursor-pointer">
+                          <Trash2 className="h-4.5 w-4.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -273,30 +369,30 @@ export default function AdminAssignmentsPage() {
           <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
               <h2 className="text-lg font-bold text-white">{isEditing ? "Edit Penugasan" : "Tambah Penugasan"}</h2>
-              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white"><X className="h-5 w-5" /></button>
+              <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white cursor-pointer"><X className="h-5 w-5" /></button>
             </div>
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Guru Pengajar</label>
-                <select value={teacherId} onChange={e => setTeacherId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none">
+                <select value={teacherId} onChange={e => setTeacherId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none cursor-pointer">
                   {Object.entries(teachers).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Mata Pelajaran</label>
-                <select value={subjectId} onChange={e => setSubjectId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none">
+                <select value={subjectId} onChange={e => setSubjectId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none cursor-pointer">
                   {Object.entries(subjects).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Kelas yang Diajar</label>
-                <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none">
+                <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none cursor-pointer">
                   {Object.entries(classes).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
               </div>
               <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 text-sm text-slate-400">Batal</button>
-                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white">Simpan</button>
+                <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 text-sm text-slate-400 cursor-pointer">Batal</button>
+                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white cursor-pointer">Simpan</button>
               </div>
             </form>
           </div>

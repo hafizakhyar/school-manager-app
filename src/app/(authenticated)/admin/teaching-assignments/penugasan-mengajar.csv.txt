@@ -1,0 +1,40 @@
+Nama Guru,Mata Pelajaran,Kelas
+Iswandi Mulia Siregar S.Pd,,
+Dewi Yustiningrum S.Si,,
+Nur Halimah S.Pd,,
+Lia Seraya S.Pd,PKWU,10 X
+Lia Seraya S.Pd,PKWU,10 Y
+Lia Seraya S.Pd,PKWU,10 Z
+Jamaludin S.Pd,,
+Supomo S.Si. M.Pd.,,
+Friska Mutiara Wulandari M.Pd,,
+Nukman Nasif Nasyafi M.Pd,,
+Saddam Husein Tambunan S.Pd,,
+Endiyah Widayatun M.M.,,
+Hafiz Akhyar S.Si.,IPA,10 X
+Hafiz Akhyar S.Si.,IPA,10 Y
+Hafiz Akhyar S.Si.,IPA,10 Z
+Hafiz Akhyar S.Si.,Kimia,11 IPA 1
+Hafiz Akhyar S.Si.,Kimia,11 IPA 2
+Hafiz Akhyar S.Si.,Kimia,12 IPA 1
+Hafiz Akhyar S.Si.,Kimia,12 IPA 2
+Soni Zainal Muslih S.Pd,,
+Ahmad Hafani S.Pd.I,,
+Rendi Maulandani S.Pd,,
+Sriyadi S.T,,
+M. Israfil S.Pd,,
+Casyono S.Pd,,
+Zaki Ardi S.S,,
+Irwansyah S.Pd,,
+Munandar M.Pd,,
+Wildan Ade S.Kom,,
+Ahmad Catur S.Pd,,
+Sigit Hidayat,,
+Alpian Nurmuslim,,
+Bagus Nurfurqan S.Pd,,
+Habibah Izza S.Pd.I,,
+Rina Februanti S.Pd,,
+Rizki Putra Perdana S.Pd,,
+Andi Warman S.Kom,,
+Jihan Azizah S.Pd,,
+Roman Istihori S.Pd,,
