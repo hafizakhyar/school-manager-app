@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
-import { UserPlus, Upload, Trash2 } from 'lucide-react';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { UserPlus, Upload } from 'lucide-react';
 
 interface Siswa {
   id?: string;
@@ -16,6 +16,7 @@ interface Siswa {
 export default function AdminSiswaPage() {
   const [dataSiswa, setDataSiswa] = useState<Siswa[]>([]);
   const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // State Filter & Search
   const [search, setSearch] = useState('');
@@ -23,46 +24,105 @@ export default function AdminSiswaPage() {
   const [filterGender, setFilterGender] = useState('ALL');
   const [selectedNis, setSelectedNis] = useState<string[]>([]);
 
-  useEffect(() => {
-    async function fetchSiswa() {
-      try {
-        setLoading(true);
-        const querySnapshot = await getDocs(collection(db, 'students'));
-        const fetchedData: Siswa[] = [];
-        
-        querySnapshot.forEach((doc) => {
-          const raw = doc.data() as any;
-          const keys = Object.keys(raw);
+  const fetchSiswa = async () => {
+    try {
+      setLoading(true);
+      const querySnapshot = await getDocs(collection(db, 'students'));
+      const fetchedData: Siswa[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const raw = doc.data() as any;
+        const keys = Object.keys(raw);
 
-          const nisKey = keys.find(k => k.toLowerCase().includes('nis'));
-          const nameKey = keys.find(k => k.toLowerCase().includes('nama') || k.toLowerCase().includes('name'));
-          const kelasKey = keys.find(k => k.toLowerCase().includes('kelas') || k.toLowerCase().includes('class') || k.toLowerCase().includes('rombel'));
-          const genderKey = keys.find(k => k.toLowerCase().includes('gender') || k.toLowerCase().includes('kelamin') || k.toLowerCase().includes('jk'));
+        const nisKey = keys.find(k => k.toLowerCase().includes('nis'));
+        const nameKey = keys.find(k => k.toLowerCase().includes('nama') || k.toLowerCase().includes('name'));
+        const kelasKey = keys.find(k => k.toLowerCase().includes('kelas') || k.toLowerCase().includes('class') || k.toLowerCase().includes('rombel'));
+        const genderKey = keys.find(k => k.toLowerCase().includes('gender') || k.toLowerCase().includes('kelamin') || k.toLowerCase().includes('jk'));
 
-          const nisVal = nisKey ? raw[nisKey] : '';
-          const namaVal = nameKey ? raw[nameKey] : '';
-          const kelasVal = kelasKey ? raw[kelasKey] : '';
-          const genderVal = genderKey ? raw[genderKey] : 'P';
+        const nisVal = nisKey ? raw[nisKey] : '';
+        const namaVal = nameKey ? raw[nameKey] : '';
+        const kelasVal = kelasKey ? raw[kelasKey] : '';
+        const genderVal = genderKey ? raw[genderKey] : 'P';
 
-          fetchedData.push({
-            id: doc.id,
-            nis: String(nisVal || '-'),
-            nama: String(namaVal || '-'),
-            kelas: String(kelasVal || '-'),
-            jenis_kelamin: String(genderVal),
-          });
+        fetchedData.push({
+          id: doc.id,
+          nis: String(nisVal || '-'),
+          nama: String(namaVal || '-'),
+          kelas: String(kelasVal || '-'),
+          jenis_kelamin: String(genderVal),
         });
-        
-        setDataSiswa(fetchedData);
-      } catch (error) {
-        console.error("Gagal mengambil data siswa:", error);
-      } finally {
-        setLoading(false);
-      }
+      });
+      
+      setDataSiswa(fetchedData);
+    } catch (error) {
+      console.error("Gagal mengambil data siswa:", error);
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchSiswa();
   }, []);
+
+  // Fungsi Handler Upload & Parse CSV
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(l => l.trim() !== '');
+        if (lines.length <= 1) {
+          alert("File CSV kosong atau format tidak valid.");
+          return;
+        }
+
+        // Ambil header kolom baris pertama (misal: nis,nama,kelas,jenis_kelamin)
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        let count = 0;
+        setLoading(true);
+
+        for (let i = 1; i < lines.length; i++) {
+          const currentLine = lines[i].split(',').map(val => val.trim());
+          if (currentLine.length < headers.length) continue;
+
+          const rowData: any = {};
+          headers.forEach((header, index) => {
+            rowData[header] = currentLine[index];
+          });
+
+          const nisVal = rowData.nis || rowData.nisn || rowData.ID || '';
+          const namaVal = rowData.nama || rowData.name || rowData.nama_lengkap || '';
+          const kelasVal = rowData.kelas || rowData.class || '';
+          const genderVal = rowData.jenis_kelamin || rowData.gender || rowData.jk || 'P';
+
+          if (nisVal) {
+            await addDoc(collection(db, 'students'), {
+              nis: nisVal,
+              nama: namaVal,
+              kelas: kelasVal,
+              jenis_kelamin: genderVal
+            });
+            count++;
+          }
+        }
+
+        alert(`Berhasil mengimpor ${count} data siswa baru!`);
+        fetchSiswa(); // Refresh tabel otomatis
+      } catch (err) {
+        console.error("Gagal memproses CSV:", err);
+        alert("Terjadi kesalahan saat membaca file CSV.");
+      } finally {
+        setLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Logika Filtering Data
   const filteredData = useMemo(() => {
@@ -107,6 +167,15 @@ export default function AdminSiswaPage() {
 
   return (
     <div className="p-6 space-y-6 text-slate-100">
+      {/* Hidden File Input untuk CSV */}
+      <input
+        type="file"
+        accept=".csv"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
       {/* Header dengan Tombol Tambah & CSV */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -116,7 +185,7 @@ export default function AdminSiswaPage() {
         
         <div className="flex items-center gap-2">
           <button
-            onClick={() => alert("Fitur Tambah Siswa")}
+            onClick={() => alert("Fitur Tambah Siswa Satuan")}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition shadow-lg shadow-indigo-600/20"
           >
             <UserPlus className="w-4 h-4" />
@@ -124,8 +193,8 @@ export default function AdminSiswaPage() {
           </button>
           
           <button
-            onClick={() => alert("Fitur Import CSV")}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium flex items-center gap-2 transition"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium flex items-center gap-2 transition cursor-pointer"
           >
             <Upload className="w-4 h-4" />
             + CSV
