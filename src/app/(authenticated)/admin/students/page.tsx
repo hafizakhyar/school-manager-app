@@ -31,13 +31,32 @@ export default function AdminSiswaPage() {
         
         querySnapshot.forEach((doc) => {
           const raw = doc.data() as any;
-          // Pemetaan fleksibel untuk mendeteksi berbagai variasi nama kolom di database
+          
+          // Debugging: Cetak data asli di Console Browser (tekan F12 di browser untuk melihat)
+          console.log("Firestore Doc Data:", raw);
+
+          // Ambil data dengan memeriksa berbagai variasi nama field/kolom di database
+          const nisVal = raw.nis || raw.NIS || raw.nisn || raw.NISN || raw.id_siswa || '';
+          
+          const namaVal = 
+            raw.nama || raw.Nama || raw.NAMA || 
+            raw.nama_lengkap || raw.namaLengkap || raw.fullName || 
+            raw.student_name || raw.name || '';
+
+          const kelasVal = 
+            raw.kelas || raw.Kelas || raw.KELAS || 
+            raw.className || raw.rombel || '';
+
+          const genderVal = 
+            raw.jenis_kelamin || raw.jenisKelamin || raw.Gender || 
+            raw.gender || raw.jk || 'P';
+
           fetchedData.push({
             id: doc.id,
-            nis: String(raw.nis || raw.NIS || raw.nisn || raw.NISN || ''),
-            nama: String(raw.nama || raw.Nama || raw.nama_lengkap || raw.NAMA || ''),
-            kelas: String(raw.kelas || raw.Kelas || raw.KELAS || ''),
-            jenis_kelamin: String(raw.jenis_kelamin || raw.JenisKelamin || raw.gender || raw.GENDER || 'P'),
+            nis: String(nisVal),
+            nama: String(namaVal),
+            kelas: String(kelasVal),
+            jenis_kelamin: String(genderVal),
           });
         });
         
