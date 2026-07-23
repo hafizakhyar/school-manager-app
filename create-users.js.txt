@@ -1,0 +1,36 @@
+const admin = require('firebase-admin');
+const serviceAccount = require('./serviceAccountKey.json');
+
+// Inisialisasi Firebase Admin
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+// Daftar akun yang ingin dibuat secara otomatis
+const userList = [
+  { email: 'guru5@aljannah.sch.id', password: 'GuruAljannah123' },
+  { email: 'guru6@aljannah.sch.id', password: 'GuruAljannah123' },
+  { email: 'guru7@aljannah.sch.id', password: 'GuruAljannah123' },
+  { email: 'siswa10a01@aljannah.sch.id', password: 'SiswaAljannah123' },
+  { email: 'siswa10a02@aljannah.sch.id', password: 'SiswaAljannah123' },
+  // Tambahkan email lainnya di sini...
+];
+
+async function autoCreateUsers() {
+  console.log('Memulai pembuatan akun otomatis...');
+  for (const user of userList) {
+    try {
+      const userRecord = await admin.auth().createUser({
+        email: user.email,
+        password: user.password,
+        emailVerified: true,
+      });
+      console.log(`✅ Berhasil dibuat: ${userRecord.email}`);
+    } catch (error) {
+      console.error(`❌ Gagal membuat ${user.email}:`, error.message);
+    }
+  }
+  console.log('Selesai!');
+}
+
+autoCreateUsers();

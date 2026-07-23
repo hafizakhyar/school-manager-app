@@ -1,0 +1,6 @@
+@"
+email,password
+guru5@aljannah.sch.id,GuruAljannah123
+guru6@aljannah.sch.id,GuruAljannah123
+siswa10a01@aljannah.sch.id,SiswaAljannah123
+"@ | Out-File -FilePath users.csv -Encoding utf8
