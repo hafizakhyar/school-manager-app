@@ -83,7 +83,7 @@ export default function NilaiPage() {
     async function loadConfig() {
       try {
         const classesSnap = await getDocs(collection(db, "classes"));
-        const cList = classesSnap.docs.map(d => ({ id: d.id, name: d.data().name }));
+        const cList = classesSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().className || d.id }));
         setClasses(cList);
         if (cList.length > 0) {
           setSelectedClassId(cList[0].id);
@@ -92,7 +92,7 @@ export default function NilaiPage() {
         }
 
         const subjectsSnap = await getDocs(collection(db, "subjects"));
-        const sList = subjectsSnap.docs.map(d => ({ id: d.id, name: d.data().name }));
+        const sList = subjectsSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().subjectName || d.id }));
         setSubjects(sList);
 
         if (teacherId) {
@@ -126,7 +126,7 @@ export default function NilaiPage() {
     loadConfig();
   }, [teacherId]);
 
-  // Load students for Input Tab when class changes
+  // Load students for Input Tab with flexible class matching
   useEffect(() => {
     async function loadStudentsForInput() {
       if (!selectedClassId || activeTab !== "input") return;
@@ -134,13 +134,28 @@ export default function NilaiPage() {
       setLoadingStudents(true);
       setSaveSuccess(false);
       try {
-        const studentsSnap = await getDocs(query(
-          collection(db, "students"),
-          where("classId", "==", selectedClassId),
-          where("status", "==", "Aktif")
-        ));
+        const selectedClassObj = classes.find(c => c.id === selectedClassId);
+        const selectedClassName = selectedClassObj ? selectedClassObj.name : selectedClassId;
 
-        // Attempt to load existing scores if editing an existing assessment
+        const studentsSnap = await getDocs(collection(db, "students"));
+
+        const matchedStudentDocs = studentsSnap.docs.filter(docSnap => {
+          const data = docSnap.data();
+          const studentClass = String(data.kelas || data.classId || data.className || "").trim().toLowerCase();
+          const targetId = String(selectedClassId).trim().toLowerCase();
+          const targetName = String(selectedClassName).trim().toLowerCase();
+          const status = String(data.status || "Aktif").trim();
+
+          const isClassMatch = (
+            studentClass === targetId ||
+            studentClass === targetName ||
+            studentClass.includes(targetName) ||
+            targetName.includes(studentClass)
+          );
+
+          return isClassMatch && status === "Aktif";
+        });
+
         let existingScores: Record<string, number> = {};
         if (assessmentName.trim() !== "") {
           const existingSnap = await getDocs(query(
@@ -155,13 +170,13 @@ export default function NilaiPage() {
           });
         }
 
-        const rows: StudentRow[] = studentsSnap.docs.map(docSnap => {
+        const rows: StudentRow[] = matchedStudentDocs.map(docSnap => {
           const data = docSnap.data();
           const score = existingScores[docSnap.id];
           return {
             id: docSnap.id,
-            nisn: data.nisn,
-            fullName: data.fullName,
+            nisn: String(data.nis || data.nisn || "-"),
+            fullName: String(data.nama || data.fullName || "Tanpa Nama"),
             score: score !== undefined ? score : ""
           };
         });
@@ -175,26 +190,41 @@ export default function NilaiPage() {
     }
 
     loadStudentsForInput();
-  }, [selectedClassId, selectedSubjectId, selectedType, assessmentName, activeTab]);
+  }, [selectedClassId, selectedSubjectId, selectedType, assessmentName, activeTab, classes]);
 
-  // Load students for History Tab class filter
+  // Load students for History Tab class filter with flexible matching
   useEffect(() => {
     async function loadHistoryStudents() {
       if (!historyClassId) return;
       try {
-        const studentsSnap = await getDocs(query(
-          collection(db, "students"),
-          where("classId", "==", historyClassId),
-          where("status", "==", "Aktif")
-        ));
-        const list = studentsSnap.docs.map(d => ({
+        const historyClassObj = classes.find(c => c.id === historyClassId);
+        const historyClassName = historyClassObj ? historyClassObj.name : historyClassId;
+
+        const studentsSnap = await getDocs(collection(db, "students"));
+
+        const matchedList = studentsSnap.docs.filter(docSnap => {
+          const data = docSnap.data();
+          const studentClass = String(data.kelas || data.classId || data.className || "").trim().toLowerCase();
+          const targetId = String(historyClassId).trim().toLowerCase();
+          const targetName = String(historyClassName).trim().toLowerCase();
+          const status = String(data.status || "Aktif").trim();
+
+          const isClassMatch = (
+            studentClass === targetId ||
+            studentClass === targetName ||
+            studentClass.includes(targetName) ||
+            targetName.includes(studentClass)
+          );
+
+          return isClassMatch && status === "Aktif";
+        }).map(d => ({
           id: d.id,
-          name: d.data().fullName
+          name: String(d.data().nama || d.data().fullName || "Tanpa Nama")
         })).sort((a, b) => a.name.localeCompare(b.name));
         
-        setHistoryStudents(list);
-        if (list.length > 0) {
-          setHistoryStudentId(list[0].id);
+        setHistoryStudents(matchedList);
+        if (matchedList.length > 0) {
+          setHistoryStudentId(matchedList[0].id);
         } else {
           setHistoryStudentId("");
         }
@@ -203,7 +233,7 @@ export default function NilaiPage() {
       }
     }
     loadHistoryStudents();
-  }, [historyClassId]);
+  }, [historyClassId, classes]);
 
   // Load Grade History for student
   useEffect(() => {
@@ -240,42 +270,65 @@ export default function NilaiPage() {
     loadGradeHistory();
   }, [historyStudentId, historySemester, activeTab]);
 
-  // Load Ledger Data
+  // Load Ledger Data with flexible class matching
   useEffect(() => {
     async function loadLedgerData() {
       if (!ledgerClassId || activeTab !== "ledger") return;
 
       setLoadingLedger(true);
       try {
-        // 1. Get class active students
-        const studentsSnap = await getDocs(query(
-          collection(db, "students"),
-          where("classId", "==", ledgerClassId),
-          where("status", "==", "Aktif")
-        ));
-        const listStudents = studentsSnap.docs.map(d => ({
-          id: d.id,
-          name: d.data().fullName
-        })).sort((a, b) => a.name.localeCompare(b.name));
+        const ledgerClassObj = classes.find(c => c.id === ledgerClassId);
+        const ledgerClassName = ledgerClassObj ? ledgerClassObj.name : ledgerClassId;
+
+        const studentsSnap = await getDocs(collection(db, "students"));
+        const validStudentIds: string[] = [];
+        const listStudents: { id: string; name: string }[] = [];
+
+        studentsSnap.docs.forEach(d => {
+          const data = d.data();
+          const studentClass = String(data.kelas || data.classId || data.className || "").trim().toLowerCase();
+          const targetId = String(ledgerClassId).trim().toLowerCase();
+          const targetName = String(ledgerClassName).trim().toLowerCase();
+          const status = String(data.status || "Aktif").trim();
+
+          const isClassMatch = (
+            studentClass === targetId ||
+            studentClass === targetName ||
+            studentClass.includes(targetName) ||
+            targetName.includes(studentClass)
+          );
+
+          if (isClassMatch && status === "Aktif") {
+            validStudentIds.push(d.id);
+            listStudents.push({
+              id: d.id,
+              name: String(data.nama || data.fullName || "Tanpa Nama")
+            });
+          }
+        });
+
+        listStudents.sort((a, b) => a.name.localeCompare(b.name));
         setLedgerStudents(listStudents);
 
-        // 2. Query grades for this class + semester
+        // Fetch all grades and filter by valid student IDs for this class
         const gradesSnap = await getDocs(query(
           collection(db, "grades"),
-          where("classId", "==", ledgerClassId),
           where("semester", "==", ledgerSemester)
         ));
 
-        const listGrades: GradeRecord[] = gradesSnap.docs.map(d => {
+        const listGrades: GradeRecord[] = [];
+        gradesSnap.docs.forEach(d => {
           const data = d.data();
-          return {
-            id: d.id,
-            studentId: data.studentId,
-            subjectId: data.subjectId,
-            assessmentType: data.assessmentType,
-            assessmentName: data.assessmentName,
-            score: data.score
-          };
+          if (validStudentIds.includes(data.studentId)) {
+            listGrades.push({
+              id: d.id,
+              studentId: data.studentId,
+              subjectId: data.subjectId,
+              assessmentType: data.assessmentType,
+              assessmentName: data.assessmentName,
+              score: data.score
+            });
+          }
         });
         setLedgerGrades(listGrades);
       } catch (err) {
@@ -286,7 +339,7 @@ export default function NilaiPage() {
     }
 
     loadLedgerData();
-  }, [ledgerClassId, ledgerSemester, activeTab]);
+  }, [ledgerClassId, ledgerSemester, activeTab, classes]);
 
   const handleScoreChange = (studentId: string, value: string) => {
     let scoreVal: number | "" = "";
@@ -303,7 +356,6 @@ export default function NilaiPage() {
       return;
     }
 
-    // Verify all scores are filled
     const unfilled = students.some(s => s.score === "");
     if (unfilled) {
       if (!confirm("Beberapa siswa belum memiliki nilai. Simpan sebagai 0?")) {
@@ -318,8 +370,6 @@ export default function NilaiPage() {
       const batch = writeBatch(db);
 
       students.forEach((student) => {
-        // Document ID: studentId_classId_subjectId_assessmentType_assessmentName
-        // Sanitizing assessmentName for ID string
         const sanitizedName = assessmentName.trim().replace(/[^a-zA-Z0-9]/g, "_");
         const docId = `${student.id}_${selectedClassId}_${selectedSubjectId}_${selectedType}_${sanitizedName}`;
         const docRef = doc(db, "grades", docId);
@@ -343,7 +393,7 @@ export default function NilaiPage() {
 
       await batch.commit();
       setSaveSuccess(true);
-      setAssessmentName(""); // clear input
+      setAssessmentName("");
       setTimeout(() => setSaveSuccess(false), 5000);
     } catch (error) {
       console.error("Error writing grades:", error);
@@ -353,7 +403,6 @@ export default function NilaiPage() {
     }
   };
 
-  // Helper calculations for History Tab
   const subjectAverages: Record<string, { total: number; count: number }> = {};
   gradesHistory.forEach(record => {
     if (!subjectAverages[record.subjectId]) {
@@ -368,12 +417,9 @@ export default function NilaiPage() {
     return acc;
   }, {} as Record<string, string>);
 
-  // Helper calculations for Ledger Ledger/Rapor Tab
-  // Generates final average score per student per subject per semester client-side
   const studentLedgerData = ledgerStudents.map(student => {
     const studentGrades = ledgerGrades.filter(g => g.studentId === student.id);
     
-    // Group by subject to compute average
     const subAverages: Record<string, number> = {};
     subjects.forEach(subject => {
       const subjectGrades = studentGrades.filter(g => g.subjectId === subject.id);
@@ -381,7 +427,7 @@ export default function NilaiPage() {
         const sum = subjectGrades.reduce((acc, curr) => acc + curr.score, 0);
         subAverages[subject.id] = Math.round(sum / subjectGrades.length);
       } else {
-        subAverages[subject.id] = 0; // default 0 if no grades
+        subAverages[subject.id] = 0;
       }
     });
 
@@ -402,7 +448,6 @@ export default function NilaiPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Nilai Siswa</h1>
         <p className="text-sm text-slate-400 mt-1">
@@ -410,7 +455,6 @@ export default function NilaiPage() {
         </p>
       </div>
 
-      {/* Tabs Selector */}
       <div className="flex border-b border-slate-900">
         <button
           onClick={() => setActiveTab("input")}
@@ -449,10 +493,8 @@ export default function NilaiPage() {
         )}
       </div>
 
-      {/* -------------------- TAB 1: INPUT GRADES -------------------- */}
       {activeTab === "input" && (
         <div className="space-y-6">
-          {/* Settings Panel */}
           <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
               <div>
@@ -536,7 +578,6 @@ export default function NilaiPage() {
             </div>
           </div>
 
-          {/* Success banner */}
           {saveSuccess && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm text-emerald-400">
               <CheckCircle className="h-5 w-5 shrink-0" />
@@ -544,7 +585,6 @@ export default function NilaiPage() {
             </div>
           )}
 
-          {/* Grades Table */}
           {loadingStudents ? (
             <div className="space-y-4">
               <div className="h-10 w-full animate-pulse rounded bg-slate-900" />
@@ -564,7 +604,7 @@ export default function NilaiPage() {
                 <table className="w-full text-left text-sm text-slate-300">
                   <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
                     <tr>
-                      <th className="py-4 px-4 w-40">NISN</th>
+                      <th className="py-4 px-4 w-40">NIS</th>
                       <th className="py-4 px-4 min-w-[250px]">Nama Siswa</th>
                       <th className="py-4 px-4 w-48 text-right">Nilai (0-100)</th>
                     </tr>
@@ -594,12 +634,11 @@ export default function NilaiPage() {
                 </table>
               </div>
 
-              {/* Save Button */}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleSaveGrades}
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="h-5 w-5" />
                   <span>{saving ? "Menyimpan..." : "Simpan Semua Nilai"}</span>
@@ -610,10 +649,8 @@ export default function NilaiPage() {
         </div>
       )}
 
-      {/* -------------------- TAB 2: HISTORY PER STUDENT -------------------- */}
       {activeTab === "history" && (
         <div className="space-y-6">
-          {/* History Selection Card */}
           <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
             <div className="grid gap-4 sm:grid-cols-3 items-end">
               <div>
@@ -654,7 +691,6 @@ export default function NilaiPage() {
             </div>
           </div>
 
-          {/* History Details */}
           {loadingHistory ? (
             <div className="h-64 w-full animate-pulse rounded bg-slate-900 border border-slate-800" />
           ) : !historyStudentId ? (
@@ -667,7 +703,6 @@ export default function NilaiPage() {
             </div>
           ) : (
             <div className="grid gap-6 md:grid-cols-3 items-start">
-              {/* Summary cards: Subject Averages */}
               <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Rata-Rata Nilai Mapel</h3>
                 <div className="space-y-3">
@@ -683,7 +718,6 @@ export default function NilaiPage() {
                 </div>
               </div>
 
-              {/* Detail Table */}
               <div className="md:col-span-2 rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Rincian Penilaian</h3>
                 
@@ -715,10 +749,8 @@ export default function NilaiPage() {
         </div>
       )}
 
-      {/* -------------------- TAB 3: LEGER RApor / LEDGER CLASS -------------------- */}
       {activeTab === "ledger" && (role === "admin" || role === "kepala_sekolah" || role === "wali_kelas") && (
         <div className="space-y-6">
-          {/* Ledger filters */}
           <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
               <div>
@@ -747,7 +779,6 @@ export default function NilaiPage() {
             </div>
           </div>
 
-          {/* Ledger Display */}
           {loadingLedger ? (
             <div className="h-64 w-full animate-pulse rounded bg-slate-900 border border-slate-800" />
           ) : ledgerStudents.length === 0 ? (
@@ -769,7 +800,7 @@ export default function NilaiPage() {
                       <th className="py-3 px-3 min-w-[200px]">Nama Siswa</th>
                       {subjects.map((subj) => (
                         <th key={subj.id} className="py-3 px-3 text-center w-24" title={subj.name}>
-                          {subj.id}
+                          {subj.name}
                         </th>
                       ))}
                       <th className="py-3 px-3 text-right w-28">Rata-Rata Umum</th>
