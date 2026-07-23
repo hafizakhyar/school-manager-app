@@ -1,64 +1,51 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { 
-  Search, 
-  Trash2, 
-  Edit3, 
-  UserX, 
-  UserCheck 
-} from 'lucide-react';
+import React, { useState, useMemo } from 'react';
 
 interface Siswa {
+  id?: string;
   nis: string;
   nama: string;
   kelas: string;
   jenis_kelamin: 'L' | 'P' | string;
-  status: 'Aktif' | 'Non-Aktif';
+  status?: string;
 }
 
-export default function SiswaTableManager({ initialData }: { initialData: Siswa[] }) {
-  const [dataSiswa, setDataSiswa] = useState<Siswa[]>(initialData);
-  
-  // State Filter & Pencarian
+export default function AdminSiswaPage() {
+  // Mock data awal sebagai fallback aman
+  const [dataSiswa, setDataSiswa] = useState<Siswa[]>([]);
   const [search, setSearch] = useState('');
   const [filterKelas, setFilterKelas] = useState('ALL');
   const [filterGender, setFilterGender] = useState('ALL');
-  const [filterStatus, setFilterStatus] = useState('ALL');
-
-  // State Pilihan Checkbox (Multi-select berdasarkan NIS)
   const [selectedNis, setSelectedNis] = useState<string[]>([]);
 
-  // 1. Logika Filtering Data
+  // Filtering data aman (mencegah error jika field undefined)
   const filteredData = useMemo(() => {
+    if (!Array.isArray(dataSiswa)) return [];
     return dataSiswa.filter((s) => {
-      const matchSearch =
-        s.nama.toLowerCase().includes(search.toLowerCase()) ||
-        s.nis.includes(search);
-      const matchKelas = filterKelas === 'ALL' || s.kelas === filterKelas;
-      const matchGender = filterGender === 'ALL' || s.jenis_kelamin === filterGender;
-      const matchStatus = filterStatus === 'ALL' || s.status === filterStatus;
+      const nama = s?.nama ? String(s.nama).toLowerCase() : '';
+      const nis = s?.nis ? String(s.nis) : '';
+      const matchSearch = nama.includes(search.toLowerCase()) || nis.includes(search);
+      const matchKelas = filterKelas === 'ALL' || s?.kelas === filterKelas;
+      const matchGender = filterGender === 'ALL' || s?.jenis_kelamin === filterGender;
 
-      return matchSearch && matchKelas && matchGender && matchStatus;
+      return matchSearch && matchKelas && matchGender;
     });
-  }, [dataSiswa, search, filterKelas, filterGender, filterStatus]);
+  }, [dataSiswa, search, filterKelas, filterGender]);
 
-  // 2. Logika Checkbox "Pilih Semua"
+  // Checkbox Select All
   const isAllSelected =
     filteredData.length > 0 &&
     filteredData.every((s) => selectedNis.includes(s.nis));
 
   const handleSelectAll = () => {
     if (isAllSelected) {
-      // Uncheck all
       setSelectedNis([]);
     } else {
-      // Check all filtered items
       setSelectedNis(filteredData.map((s) => s.nis));
     }
   };
 
-  // 3. Logika Checkbox Per Baris
   const handleSelectOne = (nis: string) => {
     if (selectedNis.includes(nis)) {
       setSelectedNis(selectedNis.filter((id) => id !== nis));
@@ -67,43 +54,30 @@ export default function SiswaTableManager({ initialData }: { initialData: Siswa[
     }
   };
 
-  // 4. Aksi Masal (Bulk Actions)
-  const handleBulkDelete = () => {
-    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedNis.length} siswa terpilih?`)) {
-      setDataSiswa((prev) => prev.filter((s) => !selectedNis.includes(s.nis)));
-      setSelectedNis([]);
-    }
-  };
-
-  const handleBulkChangeStatus = (newStatus: 'Aktif' | 'Non-Aktif') => {
-    setDataSiswa((prev) =>
-      prev.map((s) =>
-        selectedNis.includes(s.nis) ? { ...s, status: newStatus } : s
-      )
-    );
-    setSelectedNis([]);
-  };
-
-  // Daftar Kelas Unik untuk Dropdown Filter
-  const listKelas = Array.from(new Set(dataSiswa.map((s) => s.kelas))).sort();
+  const listKelas = useMemo(() => {
+    if (!Array.isArray(dataSiswa)) return [];
+    return Array.from(new Set(dataSiswa.map((s) => s.kelas))).filter(Boolean).sort();
+  }, [dataSiswa]);
 
   return (
-    <div className="space-y-4">
-      {/* ================= BAR FILTER & PENCARIAN ================= */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
-        {/* Search Bar */}
-        <div className="relative md:col-span-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Cari nama atau NIS..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-          />
+    <div className="p-6 space-y-6 text-slate-100">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Data Siswa</h1>
+          <p className="text-sm text-slate-400">Kelola data master murid SMA Islam Alam & Sains Al-Jannah.</p>
         </div>
+      </div>
 
-        {/* Filter Kelas */}
+      {/* Bar Filter */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+        <input
+          type="text"
+          placeholder="Cari nama atau NIS..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+        />
+
         <select
           value={filterKelas}
           onChange={(e) => setFilterKelas(e.target.value)}
@@ -115,7 +89,6 @@ export default function SiswaTableManager({ initialData }: { initialData: Siswa[
           ))}
         </select>
 
-        {/* Filter Gender */}
         <select
           value={filterGender}
           onChange={(e) => setFilterGender(e.target.value)}
@@ -125,70 +98,28 @@ export default function SiswaTableManager({ initialData }: { initialData: Siswa[
           <option value="L">Laki-laki</option>
           <option value="P">Perempuan</option>
         </select>
-
-        {/* Filter Status */}
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-        >
-          <option value="ALL">Semua Status</option>
-          <option value="Aktif">Aktif</option>
-          <option value="Non-Aktif">Non-Aktif</option>
-        </select>
       </div>
 
-      {/* ================= FLOATING ACTION BAR (AKSI MASAL) ================= */}
+      {/* Action Bar saat Centang Dipilih */}
       {selectedNis.length > 0 && (
-        <div className="flex items-center justify-between bg-indigo-950/80 border border-indigo-500/50 p-3 rounded-xl backdrop-blur-md transition-all animate-fadeIn">
-          <div className="text-sm font-medium text-indigo-200 flex items-center gap-2">
-            <span className="bg-indigo-600 px-2 py-0.5 rounded-full text-xs font-bold text-white">
-              {selectedNis.length}
-            </span>
-            <span>Siswa Terpilih</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleBulkChangeStatus('Aktif')}
-              className="px-3 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-            >
-              <UserCheck className="w-3.5 h-3.5" />
-              Set Aktif
-            </button>
-
-            <button
-              onClick={() => handleBulkChangeStatus('Non-Aktif')}
-              className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-            >
-              <UserX className="w-3.5 h-3.5" />
-              Set Non-Aktif
-            </button>
-
-            <button
-              onClick={handleBulkDelete}
-              className="px-3 py-1.5 bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Hapus Terpilih
-            </button>
-
-            <button
-              onClick={() => setSelectedNis([])}
-              className="text-xs text-slate-400 hover:text-white px-2 py-1 ml-2"
-            >
-              Batal
-            </button>
-          </div>
+        <div className="flex items-center justify-between bg-indigo-950/80 border border-indigo-500/50 p-3 rounded-xl">
+          <span className="text-sm text-indigo-200 font-medium">
+            {selectedNis.length} Siswa Terpilih
+          </span>
+          <button
+            onClick={() => setSelectedNis([])}
+            className="text-xs text-slate-300 hover:text-white underline"
+          >
+            Batal
+          </button>
         </div>
       )}
 
-      {/* ================= TABEL DATA ================= */}
+      {/* Tabel Data */}
       <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950/40">
         <table className="w-full text-left text-sm text-slate-300">
           <thead className="bg-slate-900/80 text-xs font-semibold text-slate-400 uppercase border-b border-slate-800">
             <tr>
-              {/* Checkbox Select All */}
               <th className="p-4 w-10 text-center">
                 <input
                   type="checkbox"
@@ -201,28 +132,25 @@ export default function SiswaTableManager({ initialData }: { initialData: Siswa[
               <th className="p-4">Nama Lengkap</th>
               <th className="p-4">Kelas</th>
               <th className="p-4">Gender</th>
-              <th className="p-4">Status</th>
-              <th className="p-4 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {filteredData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-8 text-center text-slate-500">
-                  Tidak ada data siswa yang sesuai dengan filter.
+                <td colSpan={5} className="p-8 text-center text-slate-500">
+                  Tidak ada data siswa.
                 </td>
               </tr>
             ) : (
-              filteredData.map((siswa) => {
+              filteredData.map((siswa, idx) => {
                 const isSelected = selectedNis.includes(siswa.nis);
                 return (
                   <tr
-                    key={siswa.nis}
+                    key={siswa.nis || idx}
                     className={`hover:bg-slate-900/40 transition ${
                       isSelected ? 'bg-indigo-950/20' : ''
                     }`}
                   >
-                    {/* Checkbox Per Baris */}
                     <td className="p-4 text-center">
                       <input
                         type="checkbox"
@@ -236,27 +164,6 @@ export default function SiswaTableManager({ initialData }: { initialData: Siswa[
                     <td className="p-4">{siswa.kelas}</td>
                     <td className="p-4">
                       {siswa.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          siswa.status === 'Aktif'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                        }`}
-                      >
-                        {siswa.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-400 transition">
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-rose-400 transition">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );
