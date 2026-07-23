@@ -24,9 +24,18 @@ export default function RouteGuard({ children }: { children: React.ReactNode }) 
   if (loading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-white">
-        <div className="flex flex-col items-center gap-2">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
-          <p className="text-sm text-slate-400 animate-pulse">Memuat data...</p>
+        <div className="flex flex-col items-center gap-4">
+          {/* Logo Sekolah di Layar Loading / Splash Screen */}
+          <img 
+            src="/favicon.png" 
+            alt="Logo Sekolah" 
+            className="w-20 h-20 object-contain drop-shadow-[0_0_15px_rgba(99,102,241,0.5)] animate-pulse" 
+          />
+          
+          <div className="flex flex-col items-center gap-2">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent" />
+            <p className="text-sm text-slate-400 animate-pulse font-medium">Memuat sistem...</p>
+          </div>
         </div>
       </div>
     );
