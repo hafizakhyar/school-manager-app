@@ -28,7 +28,6 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer 
 } from "recharts";
 import { useSearchParams } from "next/navigation";
@@ -91,14 +90,15 @@ export default function AbsensiPage() {
     async function loadConfig() {
       try {
         const classesSnap = await getDocs(collection(db, "classes"));
-        const cList = classesSnap.docs.map(d => ({ id: d.id, name: d.data().name }));
+        const cList = classesSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().className || d.id }));
         setClasses(cList);
         if (cList.length > 0 && !selectedClassId) {
+          setSelectedClassId(cList[0].id);
           setSummaryClassId(cList[0].id);
         }
 
         const subjectsSnap = await getDocs(collection(db, "subjects"));
-        const sList = subjectsSnap.docs.map(d => ({ id: d.id, name: d.data().name }));
+        const sList = subjectsSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().subjectName || d.id }));
         setSubjects(sList);
 
         if (teacherId) {
@@ -120,11 +120,15 @@ export default function AbsensiPage() {
           });
           setAssignedOptions(list);
           
-          // Pre-fill fields if pre-filled via params, otherwise default to first assignment
           if (!selectedClassId && list.length > 0) {
             setSelectedClassId(list[0].classId);
             setSelectedSubjectId(list[0].subjectId);
           }
+        } else if (cList.length > 0 && !selectedClassId) {
+          setSelectedClassId(cList[0].id);
+        }
+        if (sList.length > 0 && !selectedSubjectId) {
+          setSelectedSubjectId(sList[0].id);
         }
       } catch (err) {
         console.error(err);
@@ -133,7 +137,7 @@ export default function AbsensiPage() {
     loadConfig();
   }, [teacherId]);
 
-// Load students when selected parameters change
+  // Load students with flexible class matching
   useEffect(() => {
     async function loadStudents() {
       if (!selectedClassId) return;
@@ -141,30 +145,25 @@ export default function AbsensiPage() {
       setLoadingStudents(true);
       setSaveSuccess(false);
       try {
-        // Ambil nama kelas yang sedang dipilih dari state 'classes'
         const selectedClassObj = classes.find(c => c.id === selectedClassId);
         const selectedClassName = selectedClassObj ? selectedClassObj.name : selectedClassId;
 
-        // 1. Coba ambil siswa berdasarkan classId ATAU className (agar fleksibel)
-        const studentsRef = collection(db, "students");
-        
-        // Ambil semua siswa aktif terlebih dahulu untuk disaring secara aman di frontend
-        const studentsSnap = await getDocs(query(
-          studentsRef,
-          where("status", "==", "Aktif")
-        ));
+        const studentsSnap = await getDocs(collection(db, "students"));
 
-        // Filter siswa yang kelasnya cocok dengan classId ATAU nama kelas
         const matchedStudentDocs = studentsSnap.docs.filter(docSnap => {
           const data = docSnap.data();
-          const studentClass = String(data.kelas || data.classId || "").trim().toLowerCase();
+          const studentClass = String(data.kelas || data.classId || data.className || "").trim().toLowerCase();
+          const targetId = String(selectedClassId).trim().toLowerCase();
+          const targetName = String(selectedClassName).trim().toLowerCase();
+
           return (
-            studentClass === String(selectedClassId).trim().toLowerCase() ||
-            studentClass === String(selectedClassName).trim().toLowerCase()
+            studentClass === targetId ||
+            studentClass === targetName ||
+            studentClass.includes(targetName) ||
+            targetName.includes(studentClass)
           );
         });
 
-        // 2. Fetch existing attendance entries for the date
         const existingSnap = await getDocs(query(
           collection(db, "attendance"),
           where("classId", "==", selectedClassId),
@@ -186,8 +185,8 @@ export default function AbsensiPage() {
           const exist = existingMap[docSnap.id];
           return {
             id: docSnap.id,
-            nisn: data.nisn || data.nis || "-",
-            fullName: data.nama || data.fullName || "Tanpa Nama",
+            nisn: String(data.nis || data.nisn || "-"),
+            fullName: String(data.nama || data.fullName || "Tanpa Nama"),
             status: exist ? exist.status : "Hadir",
             note: exist ? exist.note : ""
           };
@@ -206,34 +205,43 @@ export default function AbsensiPage() {
     }
   }, [selectedClassId, selectedSubjectId, selectedDate, activeTab, classes]);
 
-  // Load summary metrics when filters change
+  // Load summary metrics with flexible matching for all classes
   useEffect(() => {
     async function loadSummaryData() {
       if (activeTab !== "summary" || !summaryClassId) return;
 
       setLoadingSummary(true);
       try {
-        // Fetch class students
-        const studentsSnap = await getDocs(query(
-          collection(db, "students"),
-          where("classId", "==", summaryClassId),
-          where("status", "==", "Aktif")
-        ));
+        const summaryClassObj = classes.find(c => c.id === summaryClassId);
+        const summaryClassName = summaryClassObj ? summaryClassObj.name : summaryClassId;
+
+        const studentsSnap = await getDocs(collection(db, "students"));
         const classStudents: Record<string, string> = {};
-        studentsSnap.forEach(d => classStudents[d.id] = d.data().fullName);
+        const validStudentIds: string[] = [];
 
-        // Query attendance
-        let attQuery = query(collection(db, "attendance"), where("classId", "==", summaryClassId));
-        if (summarySubjectId) {
-          attQuery = query(collection(db, "attendance"), where("classId", "==", summaryClassId), where("subjectId", "==", summarySubjectId));
-        }
+        studentsSnap.docs.forEach(d => {
+          const data = d.data();
+          const studentClass = String(data.kelas || data.classId || data.className || "").trim().toLowerCase();
+          const targetId = String(summaryClassId).trim().toLowerCase();
+          const targetName = String(summaryClassName).trim().toLowerCase();
 
-        const attSnap = await getDocs(attQuery);
+          if (
+            studentClass === targetId ||
+            studentClass === targetName ||
+            studentClass.includes(targetName) ||
+            targetName.includes(studentClass)
+          ) {
+            classStudents[d.id] = String(data.nama || data.fullName || "Tanpa Nama");
+            validStudentIds.push(d.id);
+          }
+        });
+
+        // Fetch all attendance and filter flexibly by student IDs belonging to the class
+        const attSnap = await getDocs(collection(db, "attendance"));
         
-        // Calculate rates per student
         const statsMap: Record<string, { total: number; hadir: number; sakit: number; izin: number; alpa: number; terlambat: number }> = {};
-        studentsSnap.docs.forEach(docSnap => {
-          statsMap[docSnap.id] = { total: 0, hadir: 0, sakit: 0, izin: 0, alpa: 0, terlambat: 0 };
+        validStudentIds.forEach(sid => {
+          statsMap[sid] = { total: 0, hadir: 0, sakit: 0, izin: 0, alpa: 0, terlambat: 0 };
         });
 
         const trendCounts: Record<string, { total: number; present: number }> = {};
@@ -241,14 +249,16 @@ export default function AbsensiPage() {
         attSnap.docs.forEach(docSnap => {
           const data = docSnap.data();
           
-          // Apply local date filters
+          // Verify attendance record belongs to this class's students
+          if (!validStudentIds.includes(data.studentId)) return;
+
+          if (summarySubjectId && data.subjectId !== summarySubjectId) return;
           if (summaryStartDate && data.date < summaryStartDate) return;
           if (summaryEndDate && data.date > summaryEndDate) return;
 
           const sid = data.studentId;
           const status = data.status;
 
-          // Track stats per student
           if (statsMap[sid]) {
             statsMap[sid].total += 1;
             if (status === "Hadir") statsMap[sid].hadir += 1;
@@ -258,7 +268,6 @@ export default function AbsensiPage() {
             else if (status === "Terlambat") statsMap[sid].terlambat += 1;
           }
 
-          // Track daily stats for trend chart
           const dateStr = data.date;
           if (!trendCounts[dateStr]) {
             trendCounts[dateStr] = { total: 0, present: 0 };
@@ -269,7 +278,6 @@ export default function AbsensiPage() {
           }
         });
 
-        // Map list
         const sList = Object.entries(statsMap).map(([sid, counts]) => {
           const attendanceRate = counts.total > 0
             ? Math.round(((counts.hadir + counts.terlambat) / counts.total) * 100)
@@ -288,7 +296,6 @@ export default function AbsensiPage() {
 
         setSummaryList(sList);
 
-        // Filter attention list
         const attList = sList
           .filter(student => student.alpa >= alpaThreshold)
           .map(student => ({
@@ -298,10 +305,9 @@ export default function AbsensiPage() {
           }));
         setAttentionList(attList);
 
-        // Trend calculations
         const tList = Object.entries(trendCounts).map(([date, counts]) => ({
           date,
-          rate: Math.round((counts.present / counts.total) * 100)
+          rate: counts.total > 0 ? Math.round((counts.present / counts.total) * 100) : 0
         })).sort((a, b) => a.date.localeCompare(b.date));
 
         setTrendData(tList);
@@ -313,7 +319,7 @@ export default function AbsensiPage() {
     }
 
     loadSummaryData();
-  }, [summaryClassId, summarySubjectId, summaryStartDate, summaryEndDate, alpaThreshold, activeTab]);
+  }, [summaryClassId, summarySubjectId, summaryStartDate, summaryEndDate, alpaThreshold, activeTab, classes]);
 
   const handlePeriodToggle = (num: number) => {
     setSelectedJamKe(prev => {
@@ -342,7 +348,6 @@ export default function AbsensiPage() {
       const batch = writeBatch(db);
 
       students.forEach((student) => {
-        // Document ID: studentId_classId_subjectId_date
         const docId = `${student.id}_${selectedClassId}_${selectedSubjectId}_${selectedDate}`;
         const docRef = doc(db, "attendance", docId);
         
@@ -366,7 +371,7 @@ export default function AbsensiPage() {
 
       await batch.commit();
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 5000); // clear banner after 5s
+      setTimeout(() => setSaveSuccess(false), 5000);
     } catch (error) {
       console.error("Error writing attendance:", error);
       alert("Gagal menyimpan absensi!");
@@ -379,7 +384,6 @@ export default function AbsensiPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Hadir / Absensi</h1>
         <p className="text-sm text-slate-400 mt-1">
@@ -387,7 +391,6 @@ export default function AbsensiPage() {
         </p>
       </div>
 
-      {/* Tabs Selector */}
       <div className="flex border-b border-slate-900">
         <button
           onClick={() => setActiveTab("fill")}
@@ -413,10 +416,8 @@ export default function AbsensiPage() {
         </button>
       </div>
 
-      {/* -------------------- TAB 1: FILL ATTENDANCE -------------------- */}
       {activeTab === "fill" && (
         <div className="space-y-6">
-          {/* Settings / Configuration Panel */}
           <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
               <div>
@@ -504,7 +505,6 @@ export default function AbsensiPage() {
             </div>
           </div>
 
-          {/* Success Banner */}
           {saveSuccess && (
             <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm text-emerald-400">
               <CheckCircle className="h-5 w-5 shrink-0" />
@@ -512,7 +512,6 @@ export default function AbsensiPage() {
             </div>
           )}
 
-          {/* Students Attendance Table */}
           {loadingStudents ? (
             <div className="space-y-4">
               <div className="h-10 w-full animate-pulse rounded bg-slate-900" />
@@ -532,7 +531,7 @@ export default function AbsensiPage() {
                 <table className="w-full text-left text-sm text-slate-300">
                   <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
                     <tr>
-                      <th className="py-4 px-4 w-40">NISN</th>
+                      <th className="py-4 px-4 w-40">NIS</th>
                       <th className="py-4 px-4 min-w-[200px]">Nama Siswa</th>
                       <th className="py-4 px-4 w-[360px] text-center">Status Kehadiran</th>
                       <th className="py-4 px-4 min-w-[150px]">Keterangan / Catatan</th>
@@ -544,14 +543,13 @@ export default function AbsensiPage() {
                         <td className="py-3 px-4 font-mono text-xs text-slate-400">{student.nisn}</td>
                         <td className="py-3 px-4 font-semibold text-white">{student.fullName}</td>
                         <td className="py-3 px-4">
-                          {/* Radio Buttons for Mobile Friendliness */}
                           <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                             {[
-                              { label: "H", status: "Hadir" as const, color: "hover:bg-hadir/10 focus:ring-hadir border-slate-700 checked:bg-hadir", activeBg: "peer-checked:bg-emerald-600 peer-checked:text-white" },
-                              { label: "S", status: "Sakit" as const, color: "hover:bg-sakit/10 focus:ring-sakit border-slate-700 checked:bg-sakit", activeBg: "peer-checked:bg-sky-600 peer-checked:text-white" },
-                              { label: "I", status: "Izin" as const, color: "hover:bg-izin/10 focus:ring-izin border-slate-700 checked:bg-izin", activeBg: "peer-checked:bg-amber-600 peer-checked:text-white" },
-                              { label: "A", status: "Alpa" as const, color: "hover:bg-alpa/10 focus:ring-alpa border-slate-700 checked:bg-alpa", activeBg: "peer-checked:bg-rose-600 peer-checked:text-white" },
-                              { label: "T", status: "Terlambat" as const, color: "hover:bg-terlambat/10 focus:ring-terlambat border-slate-700 checked:bg-terlambat", activeBg: "peer-checked:bg-indigo-600 peer-checked:text-white" }
+                              { label: "H", status: "Hadir" as const, activeBg: "peer-checked:bg-emerald-600 peer-checked:text-white" },
+                              { label: "S", status: "Sakit" as const, activeBg: "peer-checked:bg-sky-600 peer-checked:text-white" },
+                              { label: "I", status: "Izin" as const, activeBg: "peer-checked:bg-amber-600 peer-checked:text-white" },
+                              { label: "A", status: "Alpa" as const, activeBg: "peer-checked:bg-rose-600 peer-checked:text-white" },
+                              { label: "T", status: "Terlambat" as const, activeBg: "peer-checked:bg-indigo-600 peer-checked:text-white" }
                             ].map((opt) => (
                               <label key={opt.status} className="relative cursor-pointer">
                                 <input
@@ -583,12 +581,11 @@ export default function AbsensiPage() {
                 </table>
               </div>
 
-              {/* Save Button */}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleSaveAttendance}
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
                 >
                   <Save className="h-5 w-5" />
                   <span>{saving ? "Menyimpan..." : "Simpan Semua Absensi"}</span>
@@ -599,10 +596,8 @@ export default function AbsensiPage() {
         </div>
       )}
 
-      {/* -------------------- TAB 2: SUMMARY & REKAP -------------------- */}
       {activeTab === "summary" && (
         <div className="space-y-8">
-          {/* Summary Filters */}
           <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
               <div>
@@ -618,7 +613,7 @@ export default function AbsensiPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Mata Pelajaran (Opsional)</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Mata Pelajaran</label>
                 <select
                   value={summarySubjectId}
                   onChange={(e) => setSummarySubjectId(e.target.value)}
@@ -650,7 +645,7 @@ export default function AbsensiPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Batas Alpa Bulanan</label>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Batas Alpa</label>
                 <input
                   type="number"
                   min={1}
@@ -669,7 +664,6 @@ export default function AbsensiPage() {
             </div>
           ) : (
             <div className="space-y-8">
-              {/* Trend Chart */}
               {trendData.length > 0 && (
                 <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
                   <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-6 flex items-center gap-2">
@@ -693,12 +687,9 @@ export default function AbsensiPage() {
                 </div>
               )}
 
-              {/* Summary Tables Row */}
               <div className="grid gap-6 lg:grid-cols-3">
-                {/* Main Summary Table */}
                 <div className="lg:col-span-2 rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
                   <h2 className="text-base font-bold text-white">Rangkuman Per Siswa</h2>
-                  
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm text-slate-300">
                       <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
@@ -729,14 +720,13 @@ export default function AbsensiPage() {
                   </div>
                 </div>
 
-                {/* Attention List / Needs Attention */}
                 <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-rose-500" />
                     <h2 className="text-base font-bold text-white">Butuh Perhatian Khusus</h2>
                   </div>
                   <p className="text-xs text-slate-400">
-                    Siswa dengan jumlah ketidakhadiran tanpa keterangan (Alpa) mencapai atau melebihi {alpaThreshold} kali.
+                    Siswa dengan jumlah Alpa mencapai atau melebihi {alpaThreshold} kali.
                   </p>
 
                   {attentionList.length === 0 ? (
