@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+// Import Firestore jika Anda menggunakan Firebase Client
+import { db } from '@/lib/firebase'; // Sesuaikan lokasi konfigurasi firebase Anda
+import { collection, getDocs } from 'firebase/firestore';
 
 interface Siswa {
   id?: string;
@@ -12,14 +15,37 @@ interface Siswa {
 }
 
 export default function AdminSiswaPage() {
-  // Mock data awal sebagai fallback aman
   const [dataSiswa, setDataSiswa] = useState<Siswa[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // State Filter & Search
   const [search, setSearch] = useState('');
   const [filterKelas, setFilterKelas] = useState('ALL');
   const [filterGender, setFilterGender] = useState('ALL');
   const [selectedNis, setSelectedNis] = useState<string[]>([]);
 
-  // Filtering data aman (mencegah error jika field undefined)
+  // 1. Ambil Data dari Firestore saat Halaman Dimuat
+  useEffect(() => {
+    async function fetchSiswa() {
+      try {
+        setLoading(true);
+        const querySnapshot = await getDocs(collection(db, 'students')); // atau nama koleksi 'siswa'
+        const fetchedData: Siswa[] = [];
+        querySnapshot.forEach((doc) => {
+          fetchedData.push({ id: doc.id, ...doc.data() } as Siswa);
+        });
+        setDataSiswa(fetchedData);
+      } catch (error) {
+        console.error("Gagal mengambil data siswa:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchSiswa();
+  }, []);
+
+  // 2. Logika Filtering Data
   const filteredData = useMemo(() => {
     if (!Array.isArray(dataSiswa)) return [];
     return dataSiswa.filter((s) => {
@@ -135,7 +161,13 @@ export default function AdminSiswaPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
-            {filteredData.length === 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-slate-400">
+                  Memuat data siswa...
+                </td>
+              </tr>
+            ) : filteredData.length === 0 ? (
               <tr>
                 <td colSpan={5} className="p-8 text-center text-slate-500">
                   Tidak ada data siswa.
