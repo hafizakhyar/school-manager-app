@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "SMA Islam Alam & Sains Al-Jannah — Sistem Informasi Akademik",
   description: "Sistem Manajemen Sekolah: Jurnal Mengajar, Daftar Hadir (Absensi), dan Daftar Nilai untuk Tahun Ajaran 2026/2027",
   icons: {
-    icon: "favicon.png", // <--- Sesuaikan dengan nama file PNG Anda di folder public (contoh: favicon.png atau logo.png)
+    icon: "favicon.png
   },
 };
 
