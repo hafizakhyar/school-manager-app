@@ -1,0 +1,141 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function getRole() {
+      return getUserData().role;
+    }
+    
+    function getTeacherId() {
+      return getUserData().teacherId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getRole() == 'admin';
+    }
+    
+    function isPrincipal() {
+      return isAuthenticated() && getRole() == 'kepala_sekolah';
+    }
+    
+    function isHomeroomTeacher(classId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/classes/$(classId)).data.homeroomTeacherId == getTeacherId();
+    }
+    
+    function hasTeachingAssignment(teacherId, classId, subjectId) {
+      return exists(/databases/$(database)/documents/teachingAssignments/$(teacherId + '_' + classId + '_' + subjectId));
+    }
+
+    // Rules for Users
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || getRole() == 'admin' || getRole() == 'kepala_sekolah');
+      allow create: if isAuthenticated() && (request.auth.uid == userId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Rules for Teachers
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Rules for Students
+    match /students/{studentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Rules for Classes
+    match /classes/{classId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Rules for Subjects
+    match /subjects/{subjectId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Rules for Teaching Assignments
+    match /teachingAssignments/{assignmentId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Rules for Teaching Journals
+    match /journals/{journalId} {
+      allow read: if isAdmin() || isPrincipal() || 
+        (isAuthenticated() && resource.data.teacherId == getTeacherId());
+      
+      allow create: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.teacherId == getTeacherId() && 
+        hasTeachingAssignment(getTeacherId(), request.resource.data.classId, request.resource.data.subjectId)
+      );
+      
+      allow update, delete: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.teacherId == getTeacherId() &&
+        request.resource.data.teacherId == getTeacherId() && 
+        hasTeachingAssignment(getTeacherId(), request.resource.data.classId, request.resource.data.subjectId)
+      );
+    }
+
+    // Rules for Attendance
+    match /attendance/{attendanceId} {
+      allow read: if isAdmin() || isPrincipal() || 
+        (isAuthenticated() && (
+          resource.data.teacherId == getTeacherId() || 
+          isHomeroomTeacher(resource.data.classId)
+        ));
+      
+      allow create: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.teacherId == getTeacherId() &&
+        hasTeachingAssignment(getTeacherId(), request.resource.data.classId, request.resource.data.subjectId)
+      );
+      
+      allow update, delete: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.teacherId == getTeacherId() &&
+        request.resource.data.teacherId == getTeacherId() &&
+        hasTeachingAssignment(getTeacherId(), request.resource.data.classId, request.resource.data.subjectId)
+      );
+    }
+
+    // Rules for Grades
+    match /grades/{gradeId} {
+      allow read: if isAdmin() || isPrincipal() || 
+        (isAuthenticated() && (
+          resource.data.teacherId == getTeacherId() || 
+          isHomeroomTeacher(resource.data.classId)
+        ));
+      
+      allow create: if isAdmin() || (
+        isAuthenticated() && 
+        request.resource.data.teacherId == getTeacherId() &&
+        hasTeachingAssignment(getTeacherId(), request.resource.data.classId, request.resource.data.subjectId)
+      );
+      
+      allow update, delete: if isAdmin() || (
+        isAuthenticated() && 
+        resource.data.teacherId == getTeacherId() &&
+        request.resource.data.teacherId == getTeacherId() &&
+        hasTeachingAssignment(getTeacherId(), request.resource.data.classId, request.resource.data.subjectId)
+      );
+    }
+  }
+}

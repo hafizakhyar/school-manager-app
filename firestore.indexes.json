@@ -1,0 +1,40 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "journals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teacherId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "journals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "teacherId", "order": "ASCENDING" },
+        { "fieldPath": "classId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "semester", "order": "ASCENDING" },
+        { "fieldPath": "academicYear", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "grades",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentId", "order": "ASCENDING" },
+        { "fieldPath": "semester", "order": "ASCENDING" },
+        { "fieldPath": "academicYear", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

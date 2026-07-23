@@ -1,0 +1,24 @@
+Code,Name,Category
+BIO,Biologi,Peminatan IPA
+PKWU,PKWU / Project Ilmiah,Wajib
+BSUN,Bahasa Sunda,Wajib
+STC,Student Company,Ekstrakurikuler
+PAI,Pendidikan Agama Islam,Wajib
+THZ,Tahsin / Tafsir / Hadist / Tahfiz,Wajib
+MTK,Matematika Wajib,Wajib
+MTL,Matematika Peminatan / TL,Peminatan IPA
+IPS,IPS,Wajib
+GEO,Geografi,Peminatan IPS
+SEJ,Sejarah,Wajib
+BING,Bahasa Inggris Wajib,Wajib
+PMING,PM Bahasa Inggris,Peminatan IPA
+PJK,PJOK & Outbond,Wajib
+EKO,Ekonomi,Peminatan IPS
+SOS,Sosiologi,Peminatan IPS
+IPA,IPA,Wajib
+KIM,Kimia,Peminatan IPA
+PKN,PPKn / PKN,Wajib
+BK,Bimbingan Konseling (BK),Wajib
+INF,Informatika / Coding,Wajib
+SBK,Seni Budaya (SBK),Wajib
+JPN,Bahasa Jepang,Wajib
