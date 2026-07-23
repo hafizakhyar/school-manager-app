@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
-import { UserPlus, Upload } from 'lucide-react';
+import { UserPlus, Upload, X } from 'lucide-react';
 
 interface Siswa {
   id?: string;
@@ -17,6 +17,14 @@ export default function AdminSiswaPage() {
   const [dataSiswa, setDataSiswa] = useState<Siswa[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State Modal Tambah Siswa Satuan
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formNis, setFormNis] = useState('');
+  const [formNama, setFormNama] = useState('');
+  const [formKelas, setFormKelas] = useState('');
+  const [formGender, setFormGender] = useState('L');
+  const [submitting, setSubmitting] = useState(false);
 
   // State Filter & Search
   const [search, setSearch] = useState('');
@@ -65,6 +73,38 @@ export default function AdminSiswaPage() {
     fetchSiswa();
   }, []);
 
+  // Submit Tambah Siswa Satuan
+  const handleAddSiswaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formNis || !formNama || !formKelas) {
+      alert("Mohon lengkapi NIS, Nama Lengkap, dan Kelas!");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      await addDoc(collection(db, 'students'), {
+        nis: formNis,
+        nama: formNama.toUpperCase(),
+        kelas: formKelas,
+        jenis_kelamin: formGender
+      });
+
+      alert("Siswa baru berhasil ditambahkan!");
+      setFormNis('');
+      setFormNama('');
+      setFormKelas('');
+      setFormGender('L');
+      setIsModalOpen(false);
+      fetchSiswa(); // Refresh tabel
+    } catch (err) {
+      console.error("Gagal menyimpan siswa:", err);
+      alert("Terjadi kesalahan saat menyimpan data.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Fungsi Handler Upload & Parse CSV
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,9 +120,7 @@ export default function AdminSiswaPage() {
           return;
         }
 
-        // Ambil header kolom baris pertama (misal: nis,nama,kelas,jenis_kelamin)
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-        
         let count = 0;
         setLoading(true);
 
@@ -103,7 +141,7 @@ export default function AdminSiswaPage() {
           if (nisVal) {
             await addDoc(collection(db, 'students'), {
               nis: nisVal,
-              nama: namaVal,
+              nama: namaVal.toUpperCase(),
               kelas: kelasVal,
               jenis_kelamin: genderVal
             });
@@ -112,7 +150,7 @@ export default function AdminSiswaPage() {
         }
 
         alert(`Berhasil mengimpor ${count} data siswa baru!`);
-        fetchSiswa(); // Refresh tabel otomatis
+        fetchSiswa();
       } catch (err) {
         console.error("Gagal memproses CSV:", err);
         alert("Terjadi kesalahan saat membaca file CSV.");
@@ -166,7 +204,7 @@ export default function AdminSiswaPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 text-slate-100">
+    <div className="p-6 space-y-6 text-slate-100 relative">
       {/* Hidden File Input untuk CSV */}
       <input
         type="file"
@@ -185,8 +223,8 @@ export default function AdminSiswaPage() {
         
         <div className="flex items-center gap-2">
           <button
-            onClick={() => alert("Fitur Tambah Siswa Satuan")}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition shadow-lg shadow-indigo-600/20"
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition shadow-lg shadow-indigo-600/20 cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
             Tambah Siswa
@@ -201,6 +239,90 @@ export default function AdminSiswaPage() {
           </button>
         </div>
       </div>
+
+      {/* Modal / Popup Form Tambah Siswa */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <h2 className="text-lg font-bold text-white">Tambah Data Siswa</h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg bg-slate-800/50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddSiswaSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">NIS</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: 242500005"
+                  value={formNis}
+                  onChange={(e) => setFormNis(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Nama Lengkap</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: AHMAD FAUZAN"
+                  value={formNama}
+                  onChange={(e) => setFormNama(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Kelas</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: 12 IPA 1"
+                  value={formKelas}
+                  onChange={(e) => setFormKelas(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase text-slate-400 mb-1">Gender</label>
+                <select
+                  value={formGender}
+                  onChange={(e) => setFormGender(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="L">Laki-laki</option>
+                  <option value="P">Perempuan</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+                >
+                  {submitting ? 'Menyimpan...' : 'Simpan Siswa'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Bar Filter & Pencarian */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
