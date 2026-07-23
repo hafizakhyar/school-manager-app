@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-// Import Firestore jika Anda menggunakan Firebase Client
-import { db } from '@/lib/firebase'; // Sesuaikan lokasi konfigurasi firebase Anda
+import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
 interface Siswa {
@@ -10,8 +9,7 @@ interface Siswa {
   nis: string;
   nama: string;
   kelas: string;
-  jenis_kelamin: 'L' | 'P' | string;
-  status?: string;
+  jenis_kelamin: string;
 }
 
 export default function AdminSiswaPage() {
@@ -24,16 +22,25 @@ export default function AdminSiswaPage() {
   const [filterGender, setFilterGender] = useState('ALL');
   const [selectedNis, setSelectedNis] = useState<string[]>([]);
 
-  // 1. Ambil Data dari Firestore saat Halaman Dimuat
   useEffect(() => {
     async function fetchSiswa() {
       try {
         setLoading(true);
-        const querySnapshot = await getDocs(collection(db, 'students')); // atau nama koleksi 'siswa'
+        const querySnapshot = await getDocs(collection(db, 'students'));
         const fetchedData: Siswa[] = [];
+        
         querySnapshot.forEach((doc) => {
-          fetchedData.push({ id: doc.id, ...doc.data() } as Siswa);
+          const raw = doc.data() as any;
+          // Pemetaan fleksibel untuk mendeteksi berbagai variasi nama kolom di database
+          fetchedData.push({
+            id: doc.id,
+            nis: String(raw.nis || raw.NIS || raw.nisn || raw.NISN || ''),
+            nama: String(raw.nama || raw.Nama || raw.nama_lengkap || raw.NAMA || ''),
+            kelas: String(raw.kelas || raw.Kelas || raw.KELAS || ''),
+            jenis_kelamin: String(raw.jenis_kelamin || raw.JenisKelamin || raw.gender || raw.GENDER || 'P'),
+          });
         });
+        
         setDataSiswa(fetchedData);
       } catch (error) {
         console.error("Gagal mengambil data siswa:", error);
@@ -45,19 +52,25 @@ export default function AdminSiswaPage() {
     fetchSiswa();
   }, []);
 
-  // 2. Logika Filtering Data
+  // Logika Filtering Data
   const filteredData = useMemo(() => {
     if (!Array.isArray(dataSiswa)) return [];
     return dataSiswa.filter((s) => {
-      const nama = s?.nama ? String(s.nama).toLowerCase() : '';
-      const nis = s?.nis ? String(s.nis) : '';
-      const matchSearch = nama.includes(search.toLowerCase()) || nis.includes(search);
-      const matchKelas = filterKelas === 'ALL' || s?.kelas === filterKelas;
-      const matchGender = filterGender === 'ALL' || s?.jenis_kelamin === filterGender;
+      const matchSearch =
+        s.nama.toLowerCase().includes(search.toLowerCase()) ||
+        s.nis.includes(search);
+      const matchKelas = filterKelas === 'ALL' || s.kelas === filterKelas;
+      const matchGender = filterGender === 'ALL' || s.jenis_kelamin === filterGender;
 
       return matchSearch && matchKelas && matchGender;
     });
   }, [dataSiswa, search, filterKelas, filterGender]);
+
+  // Daftar Kelas Unik untuk Dropdown Filter
+  const listKelas = useMemo(() => {
+    if (!Array.isArray(dataSiswa)) return [];
+    return Array.from(new Set(dataSiswa.map((s) => s.kelas))).filter(Boolean).sort();
+  }, [dataSiswa]);
 
   // Checkbox Select All
   const isAllSelected =
@@ -79,11 +92,6 @@ export default function AdminSiswaPage() {
       setSelectedNis([...selectedNis, nis]);
     }
   };
-
-  const listKelas = useMemo(() => {
-    if (!Array.isArray(dataSiswa)) return [];
-    return Array.from(new Set(dataSiswa.map((s) => s.kelas))).filter(Boolean).sort();
-  }, [dataSiswa]);
 
   return (
     <div className="p-6 space-y-6 text-slate-100">
@@ -155,9 +163,9 @@ export default function AdminSiswaPage() {
                 />
               </th>
               <th className="p-4">NIS</th>
-              <th className="p-4">Nama Lengkap</th>
-              <th className="p-4">Kelas</th>
-              <th className="p-4">Gender</th>
+              <th className="p-4">NAMA LENGKAP</th>
+              <th className="p-4">KELAS</th>
+              <th className="p-4">GENDER</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
@@ -191,11 +199,11 @@ export default function AdminSiswaPage() {
                         className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </td>
-                    <td className="p-4 font-mono text-slate-400">{siswa.nis}</td>
-                    <td className="p-4 font-bold text-slate-100">{siswa.nama}</td>
-                    <td className="p-4">{siswa.kelas}</td>
+                    <td className="p-4 font-mono text-slate-400">{siswa.nis || '-'}</td>
+                    <td className="p-4 font-bold text-slate-100">{siswa.nama || '-'}</td>
+                    <td className="p-4">{siswa.kelas || '-'}</td>
                     <td className="p-4">
-                      {siswa.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan'}
+                      {siswa.jenis_kelamin === 'L' ? 'Laki-laki' : siswa.jenis_kelamin === 'P' ? 'Perempuan' : siswa.jenis_kelamin}
                     </td>
                   </tr>
                 );
