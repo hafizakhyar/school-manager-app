@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import { UserPlus, Upload, Trash2 } from 'lucide-react';
 
 interface Siswa {
   id?: string;
@@ -33,7 +34,6 @@ export default function AdminSiswaPage() {
           const raw = doc.data() as any;
           const keys = Object.keys(raw);
 
-          // Pencarian otomatis nama kolom berdasarkan kecocokan teks (Case-insensitive)
           const nisKey = keys.find(k => k.toLowerCase().includes('nis'));
           const nameKey = keys.find(k => k.toLowerCase().includes('nama') || k.toLowerCase().includes('name'));
           const kelasKey = keys.find(k => k.toLowerCase().includes('kelas') || k.toLowerCase().includes('class') || k.toLowerCase().includes('rombel'));
@@ -78,7 +78,7 @@ export default function AdminSiswaPage() {
     });
   }, [dataSiswa, search, filterKelas, filterGender]);
 
-  // Daftar Kelas Unik untuk Dropdown Filter (Otomatis muncul dari data)
+  // Daftar Kelas Unik untuk Dropdown Filter
   const listKelas = useMemo(() => {
     if (!Array.isArray(dataSiswa)) return [];
     return Array.from(new Set(dataSiswa.map((s) => s.kelas))).filter(k => k && k !== '-').sort();
@@ -107,14 +107,33 @@ export default function AdminSiswaPage() {
 
   return (
     <div className="p-6 space-y-6 text-slate-100">
-      <div className="flex justify-between items-center">
+      {/* Header dengan Tombol Tambah & CSV */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Data Siswa</h1>
           <p className="text-sm text-slate-400">Kelola data master murid SMA Islam Alam & Sains Al-Jannah.</p>
         </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => alert("Fitur Tambah Siswa")}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium flex items-center gap-2 transition shadow-lg shadow-indigo-600/20"
+          >
+            <UserPlus className="w-4 h-4" />
+            Tambah Siswa
+          </button>
+          
+          <button
+            onClick={() => alert("Fitur Import CSV")}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium flex items-center gap-2 transition"
+          >
+            <Upload className="w-4 h-4" />
+            + CSV
+          </button>
+        </div>
       </div>
 
-      {/* Bar Filter */}
+      {/* Bar Filter & Pencarian */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
         <input
           type="text"
@@ -148,13 +167,16 @@ export default function AdminSiswaPage() {
 
       {/* Action Bar saat Centang Dipilih */}
       {selectedNis.length > 0 && (
-        <div className="flex items-center justify-between bg-indigo-950/80 border border-indigo-500/50 p-3 rounded-xl">
-          <span className="text-sm text-indigo-200 font-medium">
-            {selectedNis.length} Siswa Terpilih
-          </span>
+        <div className="flex items-center justify-between bg-indigo-950/80 border border-indigo-500/50 p-3 rounded-xl backdrop-blur-md">
+          <div className="text-sm font-medium text-indigo-200 flex items-center gap-2">
+            <span className="bg-indigo-600 px-2 py-0.5 rounded-full text-xs font-bold text-white">
+              {selectedNis.length}
+            </span>
+            <span>Siswa Terpilih</span>
+          </div>
           <button
             onClick={() => setSelectedNis([])}
-            className="text-xs text-slate-300 hover:text-white underline"
+            className="text-xs text-slate-300 hover:text-white underline px-2 py-1"
           >
             Batal
           </button>
