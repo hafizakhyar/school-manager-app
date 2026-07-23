@@ -133,7 +133,7 @@ export default function AbsensiPage() {
     loadConfig();
   }, [teacherId]);
 
-  // Load students when selected parameters change
+// Load students when selected parameters change
   useEffect(() => {
     async function loadStudents() {
       if (!selectedClassId) return;
@@ -141,12 +141,28 @@ export default function AbsensiPage() {
       setLoadingStudents(true);
       setSaveSuccess(false);
       try {
-        // 1. Fetch active students in class
+        // Ambil nama kelas yang sedang dipilih dari state 'classes'
+        const selectedClassObj = classes.find(c => c.id === selectedClassId);
+        const selectedClassName = selectedClassObj ? selectedClassObj.name : selectedClassId;
+
+        // 1. Coba ambil siswa berdasarkan classId ATAU className (agar fleksibel)
+        const studentsRef = collection(db, "students");
+        
+        // Ambil semua siswa aktif terlebih dahulu untuk disaring secara aman di frontend
         const studentsSnap = await getDocs(query(
-          collection(db, "students"),
-          where("classId", "==", selectedClassId),
+          studentsRef,
           where("status", "==", "Aktif")
         ));
+
+        // Filter siswa yang kelasnya cocok dengan classId ATAU nama kelas
+        const matchedStudentDocs = studentsSnap.docs.filter(docSnap => {
+          const data = docSnap.data();
+          const studentClass = String(data.kelas || data.classId || "").trim().toLowerCase();
+          return (
+            studentClass === String(selectedClassId).trim().toLowerCase() ||
+            studentClass === String(selectedClassName).trim().toLowerCase()
+          );
+        });
 
         // 2. Fetch existing attendance entries for the date
         const existingSnap = await getDocs(query(
@@ -165,13 +181,13 @@ export default function AbsensiPage() {
           };
         });
 
-        const rows: StudentRow[] = studentsSnap.docs.map(docSnap => {
+        const rows: StudentRow[] = matchedStudentDocs.map(docSnap => {
           const data = docSnap.data();
           const exist = existingMap[docSnap.id];
           return {
             id: docSnap.id,
-            nisn: data.nisn,
-            fullName: data.fullName,
+            nisn: data.nisn || data.nis || "-",
+            fullName: data.nama || data.fullName || "Tanpa Nama",
             status: exist ? exist.status : "Hadir",
             note: exist ? exist.note : ""
           };
@@ -179,7 +195,7 @@ export default function AbsensiPage() {
 
         setStudents(rows.sort((a, b) => a.fullName.localeCompare(b.fullName)));
       } catch (err) {
-        console.error(err);
+        console.error("Gagal memuat siswa:", err);
       } finally {
         setLoadingStudents(false);
       }
@@ -188,7 +204,7 @@ export default function AbsensiPage() {
     if (activeTab === "fill") {
       loadStudents();
     }
-  }, [selectedClassId, selectedSubjectId, selectedDate, activeTab]);
+  }, [selectedClassId, selectedSubjectId, selectedDate, activeTab, classes]);
 
   // Load summary metrics when filters change
   useEffect(() => {
