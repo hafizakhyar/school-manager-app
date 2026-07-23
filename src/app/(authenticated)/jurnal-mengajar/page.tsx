@@ -46,7 +46,7 @@ export default function JurnalMengajarPage() {
   const [teachers, setTeachers] = useState<Record<string, string>>({});
   const [classes, setClasses] = useState<Record<string, string>>({});
   const [subjects, setSubjects] = useState<Record<string, string>>({});
-  
+   
   // Teaching assignments for current teacher form dropdown
   const [assignedOptions, setAssignedOptions] = useState<{ classId: string; className: string; subjectId: string; subjectName: string }[]>([]);
 
@@ -94,22 +94,22 @@ export default function JurnalMengajarPage() {
 
         const classesSnap = await getDocs(collection(db, "classes"));
         const cMap: Record<string, string> = {};
-        classesSnap.forEach(d => cMap[d.id] = d.data().name);
+        classesSnap.forEach(d => cMap[d.id] = d.data().name || d.data().className || d.id);
         setClasses(cMap);
 
         const subjectsSnap = await getDocs(collection(db, "subjects"));
         const sMap: Record<string, string> = {};
-        subjectsSnap.forEach(d => sMap[d.id] = d.data().name);
+        subjectsSnap.forEach(d => sMap[d.id] = d.data().name || d.data().subjectName || d.id);
         setSubjects(sMap);
 
-        // 2. Fetch teaching assignments for this teacher if applicable
+        // 2. Fetch teaching assignments or fallback to all classes & subjects if none assigned
+        const options: typeof assignedOptions = [];
         if (teacherId) {
           const assignmentsSnap = await getDocs(query(
             collection(db, "teachingAssignments"),
             where("teacherId", "==", teacherId)
           ));
           
-          const options: typeof assignedOptions = [];
           assignmentsSnap.forEach(d => {
             const data = d.data();
             options.push({
@@ -119,8 +119,26 @@ export default function JurnalMengajarPage() {
               subjectName: sMap[data.subjectId] || data.subjectId
             });
           });
-          setAssignedOptions(options);
         }
+
+        // Fallback: If no specific teaching assignments found, combine all classes and subjects so form is never empty
+        if (options.length === 0) {
+          const classEntries = Object.entries(cMap);
+          const subjectEntries = Object.entries(sMap);
+          
+          // Pair them up or list combinations
+          classEntries.forEach(([cId, cName]) => {
+            subjectEntries.forEach(([sId, sName]) => {
+              options.push({
+                classId: cId,
+                className: cName,
+                subjectId: sId,
+                subjectName: sName
+              });
+            });
+          });
+        }
+        setAssignedOptions(options);
 
         // 3. Fetch Journals
         await fetchJournals(tMap, cMap, sMap);
@@ -140,12 +158,10 @@ export default function JurnalMengajarPage() {
     sMap: Record<string, string> = subjects
   ) => {
     let journalsQuery;
-    
+     
     if (role === "admin" || role === "kepala_sekolah") {
-      // Admin/Principal can view all journals
       journalsQuery = query(collection(db, "journals"), orderBy("date", "desc"));
     } else {
-      // Guru/Wali Kelas only see their own journals
       journalsQuery = query(
         collection(db, "journals"), 
         where("teacherId", "==", teacherId || ""), 
@@ -218,7 +234,7 @@ export default function JurnalMengajarPage() {
     setSubmitting(true);
     try {
       const selectedOption = assignedOptions[parseInt(formData.selectedAssignmentIdx)];
-      
+       
       const journalPayload = {
         teacherId: teacherId || "",
         classId: selectedOption.classId,
@@ -236,16 +252,13 @@ export default function JurnalMengajarPage() {
       };
 
       const docRef = await addDoc(collection(db, "journals"), journalPayload);
-      console.log("Journal added with ID:", docRef.id);
 
-      // Store saved details for attendance prompt modal
       setSavedJournalId(docRef.id);
       setSavedClassId(selectedOption.classId);
       setSavedSubjectId(selectedOption.subjectId);
       setSavedDate(formData.date);
       setSavedJamKe(formData.jamKe);
 
-      // Reset form
       setFormData({
         selectedAssignmentIdx: "",
         date: new Date().toISOString().split("T")[0],
@@ -258,7 +271,6 @@ export default function JurnalMengajarPage() {
       });
       setShowForm(false);
 
-      // Refresh list
       await fetchJournals();
     } catch (error) {
       console.error("Error creating journal entry:", error);
@@ -268,7 +280,6 @@ export default function JurnalMengajarPage() {
     }
   };
 
-  // Filter local results if full server-side composite indexes are not deployed yet
   const filteredJournals = journals.filter(j => {
     if (filterClass && j.classId !== filterClass) return false;
     if (filterSubject && j.subjectId !== filterSubject) return false;
@@ -282,7 +293,6 @@ export default function JurnalMengajarPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header & Title */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Jurnal Mengajar</h1>
@@ -290,11 +300,11 @@ export default function JurnalMengajarPage() {
             Catatan harian proses pembelajaran guru di dalam kelas.
           </p>
         </div>
-        
+         
         {!isAdminOrKepsek && (
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-indigo-500"
+            className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-indigo-500 cursor-pointer"
           >
             <Plus className="h-4.5 w-4.5" />
             <span>Tambah Entri Jurnal</span>
@@ -302,7 +312,6 @@ export default function JurnalMengajarPage() {
         )}
       </div>
 
-      {/* Filter Card */}
       <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
         <form onSubmit={handleFilter} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
           {isAdminOrKepsek && (
@@ -320,7 +329,7 @@ export default function JurnalMengajarPage() {
               </select>
             </div>
           )}
-          
+           
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Kelas</label>
             <select
@@ -371,7 +380,6 @@ export default function JurnalMengajarPage() {
         </form>
       </div>
 
-      {/* Main Content (Journal List) */}
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(n => (
@@ -392,7 +400,6 @@ export default function JurnalMengajarPage() {
               className="rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm flex flex-col md:flex-row justify-between gap-6 hover:border-slate-800 transition-colors"
             >
               <div className="space-y-3 flex-1">
-                {/* Meta details */}
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="rounded bg-indigo-500/10 px-2 py-0.5 font-bold text-indigo-400 border border-indigo-500/10">
                     {journal.className}
@@ -413,12 +420,10 @@ export default function JurnalMengajarPage() {
                   )}
                 </div>
 
-                {/* Materi */}
                 <div>
                   <h3 className="text-base font-bold text-white">{journal.materi}</h3>
                 </div>
 
-                {/* Detailed Sections */}
                 <div className="grid gap-4 sm:grid-cols-2 text-xs text-slate-300 mt-2">
                   <div>
                     <span className="font-bold text-slate-400 block mb-0.5">Kegiatan Pembelajaran:</span>
@@ -443,17 +448,16 @@ export default function JurnalMengajarPage() {
         </div>
       )}
 
-      {/* -------------------- ADD JOURNAL ENTRY MODAL FORM -------------------- */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" onClick={() => setShowForm(false)} />
-          
+           
           <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
               <h2 className="text-lg font-bold text-white">Tambah Jurnal Mengajar Baru</h2>
               <button 
                 onClick={() => setShowForm(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -490,7 +494,6 @@ export default function JurnalMengajarPage() {
                 </div>
               </div>
 
-              {/* Periods (Jam Ke) multi-select */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Jam Ke- (Bisa pilih lebih dari satu)</label>
                 <div className="flex flex-wrap gap-2">
@@ -501,7 +504,7 @@ export default function JurnalMengajarPage() {
                         key={periodNum}
                         type="button"
                         onClick={() => handlePeriodToggle(periodNum)}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all ${
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                           isSelected
                             ? "bg-indigo-600 border-indigo-600 text-white"
                             : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
@@ -514,7 +517,6 @@ export default function JurnalMengajarPage() {
                 </div>
               </div>
 
-              {/* Materi (Required) */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Materi Pokok (Wajib)</label>
                 <input
@@ -527,7 +529,6 @@ export default function JurnalMengajarPage() {
                 />
               </div>
 
-              {/* Free-text inputs */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Kegiatan Pembelajaran</label>
                 <textarea
@@ -578,14 +579,14 @@ export default function JurnalMengajarPage() {
                 <button
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-2 text-sm font-semibold text-slate-400 hover:text-white"
+                  className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-2 text-sm font-semibold text-slate-400 hover:text-white cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
                 >
                   {submitting ? "Menyimpan..." : "Simpan Jurnal"}
                 </button>
@@ -595,16 +596,15 @@ export default function JurnalMengajarPage() {
         </div>
       )}
 
-      {/* -------------------- SUCCESS MODAL PROMPT TO FILL ATTENDANCE -------------------- */}
       {savedJournalId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" />
-          
+           
           <div className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400">
               <CheckCircle className="h-6 w-6" />
             </div>
-            
+             
             <h3 className="mt-4 text-lg font-bold text-white">Jurnal Berhasil Disimpan!</h3>
             <p className="mt-2 text-sm text-slate-400">
               Apakah Anda ingin segera mengisi absensi (daftar hadir) siswa untuk kelas, mata pelajaran, dan tanggal yang sama?
@@ -612,17 +612,17 @@ export default function JurnalMengajarPage() {
 
             <div className="flex flex-col gap-2 mt-6">
               <Link
-                href={`/absensi?classId=${savedClassId}&subjectId=${savedSubjectId}&date=${savedDate}&jamKe=${savedJamKe.join(",")}&journalId=${savedJournalId}`}
+                href={`/attendance?classId=${savedClassId}&subjectId=${savedSubjectId}&date=${savedDate}&jamKe=${savedJamKe.join(",")}&journalId=${savedJournalId}`}
                 onClick={() => setSavedJournalId(null)}
                 className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-indigo-500"
               >
                 <span>Ya, Isi Absensi Sekarang</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              
+               
               <button
                 onClick={() => setSavedJournalId(null)}
-                className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm font-semibold text-slate-400 hover:text-white"
+                className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm font-semibold text-slate-400 hover:text-white cursor-pointer"
               >
                 Tidak, Nanti Saja
               </button>
