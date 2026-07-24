@@ -127,6 +127,35 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Grafik / Bagian Bawah Dashboard */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
+          <h3 className="text-base font-bold text-white mb-4">Persentase Kehadiran per Kelas</h3>
+          <div className="h-64 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+            Grafik Batang Kehadiran Kelas
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
+          <h3 className="text-base font-bold text-white mb-4">Tren Kehadiran Mingguan</h3>
+          <div className="h-64 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+            Grafik Tren Mingguan
+          </div>
+        </div>
+      </div>
+
+      {/* Siswa Perlu Perhatian */}
+      <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-400" />
+            <h3 className="text-base font-bold text-white">Siswa Perlu Perhatian (Ketidakhadiran / Alpa)</h3>
+          </div>
+          <span className="text-xs text-slate-400">Bulan ini</span>
+        </div>
+        <p className="text-xs text-slate-500 text-center py-6">Tidak ada siswa dengan ketidakhadiran berlebih.</p>
+      </div>
     </div>
   );
 }
