@@ -1,86 +1,90 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { FileText, DownloadCloud } from "lucide-react";
-
-interface LatestFile {
-  id: string;
-  title: string;
-  fileUrl: string;
-  createdAt: any;
-}
+import React from "react";
+import { Users, TrendingUp, BookOpen, AlertTriangle } from "lucide-react";
 
 export default function DashboardPage() {
-  const [latestFile, setLatestFile] = useState<LatestFile | null>(null);
-  const [loadingFile, setLoadingFile] = useState(true);
-
-  useEffect(() => {
-    async function fetchLatestAcademicFile() {
-      try {
-        const q = query(
-          collection(db, "academicFiles"),
-          orderBy("createdAt", "desc"),
-          limit(1)
-        );
-        const snapshot = await getDocs(q);
-        if (!snapshot.empty) {
-          const docData = snapshot.docs[0];
-          setLatestFile({
-            id: docData.id,
-            ...docData.data()
-          } as LatestFile);
-        }
-      } catch (err) {
-        console.error("Gagal memuat file akademik:", err);
-      } finally {
-        setLoadingFile(false);
-      }
-    }
-
-    fetchLatestAcademicFile();
-  }, []);
-
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-extrabold text-white tracking-tight">Dashboard Akademik</h1>
+        <h1 className="text-3xl font-extrabold text-white tracking-tight">Dashboard</h1>
         <p className="text-sm text-slate-400 mt-1">Selamat datang kembali di sistem informasi sekolah.</p>
       </div>
 
-      {/* CARD DOKUMEN AKADEMIK TERBARU (Tampil untuk Semua User) */}
-      <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/40 to-slate-900/60 p-6 backdrop-blur-sm shadow-lg">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="rounded-xl bg-indigo-600/20 p-3 text-indigo-400 border border-indigo-500/30">
-              <FileText className="h-6 w-6" />
-            </div>
-            <div>
-              <span className="inline-block rounded-full bg-indigo-500/10 px-3 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-400 border border-indigo-500/20 mb-1">
-                Dokumen Akademik Terbaru
-              </span>
-              <h3 className="text-lg font-bold text-white">
-                {loadingFile ? "Memuat informasi file..." : latestFile ? latestFile.title : "Belum ada dokumen akademik yang diunggah."}
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Silakan unduh dokumen penting terbaru yang telah dipublikasikan oleh pihak sekolah.
-              </p>
-            </div>
+      {/* Statistik Cards Utama */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Total Siswa Aktif</span>
+            <Users className="h-5 w-5 text-indigo-400" />
           </div>
-
-          {latestFile && (
-            <a
-              href={latestFile.fileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-md hover:bg-indigo-500 transition-all cursor-pointer shrink-0"
-            >
-              <DownloadCloud className="h-4.5 w-4.5" />
-              <span>Unduh Dokumen</span>
-            </a>
-          )}
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">161</span>
+            <span className="text-xs text-slate-400">siswa</span>
+          </div>
         </div>
+
+        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Kehadiran Minggu Ini</span>
+            <TrendingUp className="h-5 w-5 text-emerald-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">90%</span>
+            <span className="text-xs text-emerald-400">rata-rata</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Jurnal Hari Ini</span>
+            <BookOpen className="h-5 w-5 text-amber-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">0</span>
+            <span className="text-xs text-slate-400">entri terisi</span>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
+          <div className="flex items-center justify-between text-slate-400 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Belum Mengisi Absen</span>
+            <AlertTriangle className="h-5 w-5 text-red-400" />
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white">30</span>
+            <span className="text-xs text-red-400">guru hari ini</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Grafik / Bagian Bawah Dashboard */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
+          <h3 className="text-base font-bold text-white mb-4">Persentase Kehadiran per Kelas</h3>
+          <div className="h-64 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+            Grafik Batang Kehadiran Kelas
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
+          <h3 className="text-base font-bold text-white mb-4">Tren Kehadiran Mingguan</h3>
+          <div className="h-64 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+            Grafik Tren Mingguan
+          </div>
+        </div>
+      </div>
+
+      {/* Siswa Perlu Perhatian */}
+      <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-400" />
+            <h3 className="text-base font-bold text-white">Siswa Perlu Perhatian (Ketidakhadiran / Alpa)</h3>
+          </div>
+          <span className="text-xs text-slate-400">Bulan ini</span>
+        </div>
+        <p className="text-xs text-slate-500 text-center py-6">Tidak ada siswa dengan ketidakhadiran berlebih.</p>
       </div>
     </div>
   );
