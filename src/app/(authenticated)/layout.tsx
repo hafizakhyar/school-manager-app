@@ -40,11 +40,11 @@ export default function AuthenticatedLayout({
 
   const getRoleBadgeColor = () => {
     switch (role) {
-      case "admin": return "bg-red-500/10 text-red-400 border-red-500/20";
-      case "kepala_sekolah": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-      case "wali_kelas": return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      case "guru": return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
-      default: return "bg-slate-500/10 text-slate-400 border-slate-500/20";
+      case "admin": return "bg-red-500/10 text-red-600 border-red-500/20";
+      case "kepala_sekolah": return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+      case "wali_kelas": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
+      case "guru": return "bg-indigo-500/10 text-indigo-600 border-indigo-500/20";
+      default: return "bg-slate-500/10 text-slate-600 border-slate-500/20";
     }
   };
 
@@ -58,7 +58,7 @@ export default function AuthenticatedLayout({
     }
   };
 
-  // Menu Utama Lengkap (Semua User)
+  // Menu Utama Lengkap
   const baseLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/jurnal-mengajar", label: "Jurnal Mengajar", icon: BookOpen },
@@ -68,7 +68,7 @@ export default function AuthenticatedLayout({
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
   ];
 
-  // Menu Khusus Admin (Master Data)
+  // Menu Khusus Admin
   const adminLinks = [
     { href: "/admin/teachers", label: "Data Guru", icon: UserSquare2 },
     { href: "/admin/students", label: "Data Siswa", icon: Users },
@@ -85,7 +85,7 @@ export default function AuthenticatedLayout({
         onClick={onClick}
         className={`group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
           isActive
-            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/15"
+            ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
             : "text-slate-400 hover:bg-slate-900 hover:text-white"
         }`}
       >
@@ -99,11 +99,11 @@ export default function AuthenticatedLayout({
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      {/* Sidebar - Desktop */}
-      <aside className="hidden w-72 shrink-0 border-r border-slate-900 bg-slate-900/40 backdrop-blur-md lg:block">
-        <div className="flex h-16 items-center gap-3 border-b border-slate-900 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 shadow-md shadow-indigo-600/20">
+    <div className="flex min-h-screen bg-slate-100 text-slate-900">
+      {/* Sidebar - Desktop (Tetap Hitam/Gelap) */}
+      <aside className="hidden w-72 shrink-0 border-r border-slate-800 bg-slate-950 text-slate-100 lg:block">
+        <div className="flex h-16 items-center gap-3 border-b border-slate-800 px-6">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 shadow-md shadow-indigo-600/30">
             <GraduationCap className="h-5 w-5 text-white" />
           </div>
           <div>
@@ -132,8 +132,8 @@ export default function AuthenticatedLayout({
           </div>
 
           {/* User profile & Logout */}
-          <div className="border-t border-slate-900 pt-4 mt-auto">
-            <div className="mb-4 rounded-lg border border-slate-900 bg-slate-950/40 p-3">
+          <div className="border-t border-slate-800 pt-4 mt-auto">
+            <div className="mb-4 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
               <div className="flex items-center gap-2.5">
                 <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center font-bold text-indigo-400">
                   {userData?.displayName?.charAt(0) || "U"}
@@ -158,41 +158,41 @@ export default function AuthenticatedLayout({
         </div>
       </aside>
 
-      {/* Main Page Area */}
-      <div className="flex flex-1 flex-col">
+      {/* Main Page Area (Latar Belakang Terang/Putih) */}
+      <div className="flex flex-1 flex-col bg-slate-50">
         {/* Top Navbar */}
-        <header className="flex h-16 items-center justify-between border-b border-slate-900 bg-slate-950/80 px-6 backdrop-blur-md sticky top-0 z-30">
+        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur-md sticky top-0 z-30 shadow-xs">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-white lg:hidden cursor-pointer"
+              className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 lg:hidden cursor-pointer"
             >
               <Menu className="h-6 w-6" />
             </button>
             
             <div className="hidden lg:flex items-center gap-2">
-              <span className="text-xs text-slate-500">Tahun Akademik:</span>
-              <span className="rounded bg-slate-900 px-2 py-1 text-xs font-semibold text-slate-300">2026/2027</span>
+              <span className="text-xs text-slate-500 font-medium">Tahun Akademik:</span>
+              <span className="rounded-lg bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-600">2026/2027</span>
             </div>
             
             <div className="lg:hidden flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-indigo-500" />
-              <span className="font-bold text-white text-sm">Al-Jannah</span>
+              <GraduationCap className="h-5 w-5 text-indigo-600" />
+              <span className="font-bold text-slate-900 text-sm">Al-Jannah</span>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="hidden md:flex flex-col items-end text-right">
-              <p className="text-xs font-semibold text-slate-300">{userData?.displayName || user?.email}</p>
+              <p className="text-xs font-bold text-slate-800">{userData?.displayName || user?.email}</p>
               <p className="text-[10px] text-slate-500">{getRoleLabel()}</p>
             </div>
-            <div className="h-8 w-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center font-bold text-indigo-400">
+            <div className="h-8 w-8 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center font-bold text-indigo-700">
               {userData?.displayName?.charAt(0) || "U"}
             </div>
           </div>
         </header>
 
-        {/* Mobile Menu Backdrop & Drawer */}
+        {/* Mobile Menu Drawer */}
         {mobileMenuOpen && (
           <div className="fixed inset-0 z-50 flex lg:hidden">
             <div 
@@ -200,8 +200,8 @@ export default function AuthenticatedLayout({
               onClick={() => setMobileMenuOpen(false)}
             />
             
-            <div className="relative flex w-full max-w-xs flex-col bg-slate-950 border-r border-slate-900 p-4">
-              <div className="flex items-center justify-between border-b border-slate-900 pb-4 mb-4">
+            <div className="relative flex w-full max-w-xs flex-col bg-slate-950 text-slate-100 border-r border-slate-800 p-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
                     <GraduationCap className="h-4.5 w-4.5 text-white" />
@@ -234,7 +234,7 @@ export default function AuthenticatedLayout({
                 )}
               </div>
 
-              <div className="border-t border-slate-900 pt-4 mt-auto">
+              <div className="border-t border-slate-800 pt-4 mt-auto">
                 <div className="mb-4 rounded-lg bg-slate-900/50 p-3">
                   <p className="truncate text-xs font-bold text-white">{userData?.displayName || user?.email}</p>
                   <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider border ${getRoleBadgeColor()} mt-1`}>
