@@ -11,6 +11,7 @@ import {
   CalendarCheck, 
   Award, 
   FileText,
+  Megaphone,
   Users, 
   UserSquare2, 
   School, 
@@ -57,16 +58,17 @@ export default function AuthenticatedLayout({
     }
   };
 
-  // Menu Utama (Dapat diakses oleh Semua User: Admin, Guru, Siswa)
+  // Menu Utama Lengkap (Semua User)
   const baseLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/jurnal-mengajar", label: "Jurnal Mengajar", icon: BookOpen },
     { href: "/absensi", label: "Daftar Hadir / Absensi", icon: CalendarCheck },
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
+    { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
   ];
 
-  // Menu Khusus Admin
+  // Menu Khusus Admin (Master Data)
   const adminLinks = [
     { href: "/admin/teachers", label: "Data Guru", icon: UserSquare2 },
     { href: "/admin/students", label: "Data Siswa", icon: Users },
