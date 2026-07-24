@@ -1,9 +1,40 @@
 "use client";
 
-import React from "react";
-import { Users, TrendingUp, BookOpen, AlertTriangle } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { db } from "@/lib/firebase";
+import { collection, getDocs } from "firebase/firestore";
+import { Users, TrendingUp, BookOpen, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
+  const [totalStudents, setTotalStudents] = useState<number>(0);
+  const [totalTeachers, setTotalTeachers] = useState<number>(0);
+  const [totalJournals, setTotalJournals] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        // 1. Ambil jumlah total siswa dari koleksi 'students'
+        const studentsSnapshot = await getDocs(collection(db, "students"));
+        setTotalStudents(studentsSnapshot.size);
+
+        // 2. Ambil jumlah total guru dari koleksi 'teachers'
+        const teachersSnapshot = await getDocs(collection(db, "teachers"));
+        setTotalTeachers(teachersSnapshot.size);
+
+        // 3. Ambil jumlah total jurnal mengajar dari koleksi 'journals'
+        const journalsSnapshot = await getDocs(collection(db, "journals"));
+        setTotalJournals(journalsSnapshot.size);
+      } catch (error) {
+        console.error("Gagal memuat data statistik dashboard:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, []);
+
   return (
     <div className="space-y-8">
       <div>
@@ -11,7 +42,7 @@ export default function DashboardPage() {
         <p className="text-sm text-slate-400 mt-1">Selamat datang kembali di sistem informasi sekolah.</p>
       </div>
 
-      {/* Statistik Cards Utama */}
+      {/* Statistik Cards Utama (Terhubung ke Firestore) */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
@@ -19,41 +50,53 @@ export default function DashboardPage() {
             <Users className="h-5 w-5 text-indigo-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">161</span>
+            {loading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-indigo-400 my-1" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{totalStudents}</span>
+            )}
             <span className="text-xs text-slate-400">siswa</span>
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Kehadiran Minggu Ini</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Total Guru Terdaftar</span>
             <TrendingUp className="h-5 w-5 text-emerald-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">90%</span>
-            <span className="text-xs text-emerald-400">rata-rata</span>
+            {loading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-emerald-400 my-1" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{totalTeachers}</span>
+            )}
+            <span className="text-xs text-emerald-400">pengajar</span>
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Jurnal Hari Ini</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Total Jurnal Mengajar</span>
             <BookOpen className="h-5 w-5 text-amber-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">0</span>
-            <span className="text-xs text-slate-400">entri terisi</span>
+            {loading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-amber-400 my-1" />
+            ) : (
+              <span className="text-3xl font-extrabold text-white">{totalJournals}</span>
+            )}
+            <span className="text-xs text-slate-400">entri tersimpan</span>
           </div>
         </div>
 
         <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Belum Mengisi Absen</span>
-            <AlertTriangle className="h-5 w-5 text-red-400" />
+            <span className="text-xs font-bold uppercase tracking-wider">Status Sistem</span>
+            <AlertTriangle className="h-5 w-5 text-indigo-400" />
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">30</span>
-            <span className="text-xs text-red-400">guru hari ini</span>
+            <span className="text-3xl font-extrabold text-white">Aktif</span>
+            <span className="text-xs text-indigo-400">online</span>
           </div>
         </div>
       </div>
