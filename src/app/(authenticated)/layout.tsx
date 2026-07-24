@@ -15,6 +15,7 @@ import {
   School, 
   BookMarked, 
   FolderGit2, 
+  FileText,
   Menu, 
   X, 
   LogOut,
@@ -69,6 +70,7 @@ export default function AuthenticatedLayout({
     { href: "/admin/classes", label: "Data Kelas / Rombel", icon: School },
     { href: "/admin/subjects", label: "Mata Pelajaran", icon: BookMarked },
     { href: "/admin/teaching-assignments", label: "Penugasan Mengajar", icon: FolderGit2 },
+    { href: "/admin/academic-files", label: "Dokumen Akademik", icon: FileText },
   ];
 
   const menuLinks = role === "admin" ? [...baseLinks, ...adminLinks] : baseLinks;
@@ -145,7 +147,7 @@ export default function AuthenticatedLayout({
 
             <button
               onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 cursor-pointer"
             >
               <LogOut className="h-4.5 w-4.5" />
               <span>Keluar</span>
@@ -161,7 +163,7 @@ export default function AuthenticatedLayout({
           <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-white lg:hidden"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-900 hover:text-white lg:hidden cursor-pointer"
             >
               <Menu className="h-6 w-6" />
             </button>
@@ -206,7 +208,7 @@ export default function AuthenticatedLayout({
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-900 hover:text-white"
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-900 hover:text-white cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -240,7 +242,7 @@ export default function AuthenticatedLayout({
                 
                 <button
                   onClick={handleLogout}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 cursor-pointer"
                 >
                   <LogOut className="h-4.5 w-4.5" />
                   <span>Keluar</span>
