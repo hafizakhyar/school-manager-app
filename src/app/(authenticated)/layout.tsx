@@ -10,6 +10,7 @@ import {
   BookOpen, 
   CalendarCheck, 
   Award, 
+  FileText,
   Users, 
   UserSquare2, 
   School, 
@@ -56,13 +57,16 @@ export default function AuthenticatedLayout({
     }
   };
 
+  // Menu Utama (Dapat diakses oleh Semua User: Admin, Guru, Siswa)
   const baseLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/jurnal-mengajar", label: "Jurnal Mengajar", icon: BookOpen },
     { href: "/absensi", label: "Daftar Hadir / Absensi", icon: CalendarCheck },
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
+    { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
   ];
 
+  // Menu Khusus Admin
   const adminLinks = [
     { href: "/admin/teachers", label: "Data Guru", icon: UserSquare2 },
     { href: "/admin/students", label: "Data Siswa", icon: Users },
@@ -70,8 +74,6 @@ export default function AuthenticatedLayout({
     { href: "/admin/subjects", label: "Mata Pelajaran", icon: BookMarked },
     { href: "/admin/teaching-assignments", label: "Penugasan Mengajar", icon: FolderGit2 },
   ];
-
-  const menuLinks = role === "admin" ? [...baseLinks, ...adminLinks] : baseLinks;
 
   const NavLink = ({ href, label, icon: Icon, onClick }: any) => {
     const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
