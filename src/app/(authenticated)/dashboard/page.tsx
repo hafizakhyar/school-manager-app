@@ -1,133 +1,114 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
-import { Users, TrendingUp, BookOpen, AlertTriangle, Loader2 } from "lucide-react";
+import { Users, UserSquare2, BookOpen, Activity, AlertTriangle } from "lucide-react";
 
 export default function DashboardPage() {
-  const [totalStudents, setTotalStudents] = useState<number>(0);
-  const [totalTeachers, setTotalTeachers] = useState<number>(0);
-  const [totalJournals, setTotalJournals] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [stats, setStats] = useState({
+    students: 0,
+    teachers: 0,
+    journals: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchStats() {
+    const fetchDashboardData = async () => {
       try {
-        // 1. Ambil jumlah total siswa dari koleksi 'students'
-        const studentsSnapshot = await getDocs(collection(db, "students"));
-        setTotalStudents(studentsSnapshot.size);
+        const studentsSnap = await getDocs(collection(db, "students"));
+        const teachersSnap = await getDocs(collection(db, "teachers"));
+        const journalsSnap = await getDocs(collection(db, "journals"));
 
-        // 2. Ambil jumlah total guru dari koleksi 'teachers'
-        const teachersSnapshot = await getDocs(collection(db, "teachers"));
-        setTotalTeachers(teachersSnapshot.size);
-
-        // 3. Ambil jumlah total jurnal mengajar dari koleksi 'journals'
-        const journalsSnapshot = await getDocs(collection(db, "journals"));
-        setTotalJournals(journalsSnapshot.size);
+        setStats({
+          students: studentsSnap.size,
+          teachers: teachersSnap.size,
+          journals: journalsSnap.size,
+        });
       } catch (error) {
-        console.error("Gagal memuat data statistik dashboard:", error);
+        console.error("Gagal memuat data dashboard:", error);
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    fetchStats();
+    fetchDashboardData();
   }, []);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-extrabold text-white tracking-tight">Dashboard</h1>
-        <p className="text-sm text-slate-400 mt-1">Selamat datang kembali di sistem informasi sekolah.</p>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dashboard</h1>
+        <p className="text-sm text-slate-500 mt-1">Selamat datang kembali di sistem informasi sekolah.</p>
       </div>
 
-      {/* Statistik Cards Utama (Terhubung ke Firestore) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Siswa Aktif</span>
-            <Users className="h-5 w-5 text-indigo-400" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            {loading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-400 my-1" />
-            ) : (
-              <span className="text-3xl font-extrabold text-white">{totalStudents}</span>
-            )}
-            <span className="text-xs text-slate-400">siswa</span>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Siswa Aktif</p>
+              <h3 className="text-2xl font-extrabold text-slate-900 mt-1">{loading ? "..." : stats.students} <span className="text-xs font-normal text-slate-500">siswa</span></h3>
+            </div>
+            <div className="rounded-xl bg-indigo-50 p-3 text-indigo-600 border border-indigo-100">
+              <Users className="h-5 w-5" />
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Guru Terdaftar</span>
-            <TrendingUp className="h-5 w-5 text-emerald-400" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            {loading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-400 my-1" />
-            ) : (
-              <span className="text-3xl font-extrabold text-white">{totalTeachers}</span>
-            )}
-            <span className="text-xs text-emerald-400">pengajar</span>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Guru Terdaftar</p>
+              <h3 className="text-2xl font-extrabold text-slate-900 mt-1">{loading ? "..." : stats.teachers} <span className="text-xs font-normal text-slate-500">pengajar</span></h3>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600 border border-emerald-100">
+              <UserSquare2 className="h-5 w-5" />
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Total Jurnal Mengajar</span>
-            <BookOpen className="h-5 w-5 text-amber-400" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            {loading ? (
-              <Loader2 className="h-6 w-6 animate-spin text-amber-400 my-1" />
-            ) : (
-              <span className="text-3xl font-extrabold text-white">{totalJournals}</span>
-            )}
-            <span className="text-xs text-slate-400">entri tersimpan</span>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Jurnal Mengajar</p>
+              <h3 className="text-2xl font-extrabold text-slate-900 mt-1">{loading ? "..." : stats.journals} <span className="text-xs font-normal text-slate-500">entri</span></h3>
+            </div>
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-600 border border-amber-100">
+              <BookOpen className="h-5 w-5" />
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm">
-          <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Status Sistem</span>
-            <AlertTriangle className="h-5 w-5 text-indigo-400" />
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">Aktif</span>
-            <span className="text-xs text-indigo-400">online</span>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Status Sistem</p>
+              <h3 className="text-2xl font-extrabold text-emerald-600 mt-1">Aktif <span className="text-xs font-normal text-slate-500">online</span></h3>
+            </div>
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-600 border border-emerald-100">
+              <Activity className="h-5 w-5" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Grafik / Bagian Bawah Dashboard */}
+      {/* Chart Sections */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
-          <h3 className="text-base font-bold text-white mb-4">Persentase Kehadiran per Kelas</h3>
-          <div className="h-64 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-900 mb-4">Persentase Kehadiran per Kelas</h3>
+          <div className="h-64 flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400 text-sm">
             Grafik Batang Kehadiran Kelas
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
-          <h3 className="text-base font-bold text-white mb-4">Tren Kehadiran Mingguan</h3>
-          <div className="h-64 flex items-center justify-center text-slate-500 text-sm border border-dashed border-slate-800 rounded-xl">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-base font-bold text-slate-900 mb-4">Tren Kehadiran Mingguan</h3>
+          <div className="h-64 flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-slate-400 text-sm">
             Grafik Tren Mingguan
           </div>
         </div>
-      </div>
-
-      {/* Siswa Perlu Perhatian */}
-      <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-400" />
-            <h3 className="text-base font-bold text-white">Siswa Perlu Perhatian (Ketidakhadiran / Alpa)</h3>
-          </div>
-          <span className="text-xs text-slate-400">Bulan ini</span>
-        </div>
-        <p className="text-xs text-slate-500 text-center py-6">Tidak ada siswa dengan ketidakhadiran berlebih.</p>
       </div>
     </div>
   );
