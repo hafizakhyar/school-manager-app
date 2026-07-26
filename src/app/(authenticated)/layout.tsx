@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { useAuth } from "@/context/auth-context";
-import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 import { 
-  GraduationCap, 
   LayoutDashboard, 
   BookOpen, 
   CalendarCheck, 
@@ -13,51 +14,17 @@ import {
   FileText,
   Megaphone,
   Wallet,
-  Users, 
-  UserSquare2, 
-  School, 
-  BookMarked, 
-  FolderGit2, 
+  BookOpenCheck, // <-- Pastikan BookOpenCheck ditambahkan di sini
   Menu, 
   X, 
-  LogOut,
-  ChevronRight
+  LogOut 
 } from "lucide-react";
 
-export default function AuthenticatedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { user, userData, role, logout } = useAuth();
-  const router = useRouter();
+export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const handleLogout = async () => {
-    await logout();
-    router.push("/login");
-  };
-
-  const getRoleBadgeColor = () => {
-    switch (role) {
-      case "admin": return "bg-red-500/10 text-red-400 border-red-500/20";
-      case "kepala_sekolah": return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-      case "wali_kelas": return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-      case "guru": return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
-      default: return "bg-slate-500/10 text-slate-400 border-slate-500/20";
-    }
-  };
-
-  const getRoleLabel = () => {
-    switch (role) {
-      case "admin": return "Administrator";
-      case "kepala_sekolah": return "Kepala Sekolah";
-      case "wali_kelas": return "Wali Kelas";
-      case "guru": return "Guru Mata Pelajaran";
-      default: return "Pengguna";
-    }
-  };
+  const router = useRouter();
+  const { userData, role } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const baseLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -67,6 +34,7 @@ export default function AuthenticatedLayout({
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
     { href: "/tuition-fees", label: "Keuangan & SPP", icon: Wallet },
+    { href: "/tahfiz", label: "Capaian Tahfiz", icon: BookOpenCheck }, 
   ];
 
   const adminLinks = [
