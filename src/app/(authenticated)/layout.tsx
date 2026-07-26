@@ -14,17 +14,26 @@ import {
   FileText,
   Megaphone,
   Wallet,
-  BookOpenCheck, // <-- Pastikan BookOpenCheck ditambahkan di sini
+  HeartHandshake,
+  ClipboardPen,
+  BookOpenCheck,
+  GraduationCap,
+  Users, 
+  UserSquare2, 
+  School, 
+  BookMarked, 
+  FolderGit2,
   Menu, 
   X, 
-  LogOut 
+  LogOut,
+  ChevronRight
 } from "lucide-react";
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { userData, role } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { userData, role, user } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const baseLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,7 +43,9 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
     { href: "/tuition-fees", label: "Keuangan & SPP", icon: Wallet },
-    { href: "/tahfiz", label: "Capaian Tahfiz", icon: BookOpenCheck }, 
+    { href: "/counseling", label: "Bimbingan Konseling", icon: HeartHandshake },
+    { href: "/student-notes", label: "Catatan Siswa", icon: ClipboardPen },
+    { href: "/tahfiz", label: "Capaian Tahfiz", icon: BookOpenCheck },
   ];
 
   const adminLinks = [
@@ -44,6 +55,26 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     { href: "/admin/subjects", label: "Mata Pelajaran", icon: BookMarked },
     { href: "/admin/teaching-assignments", label: "Penugasan Mengajar", icon: FolderGit2 },
   ];
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/login");
+    } catch (error) {
+      console.error("Gagal keluar:", error);
+    }
+  };
+
+  const getRoleLabel = () => {
+    if (role === "admin") return "Administrator";
+    if (role === "teacher") return "Guru Pengajar";
+    return "Pengguna";
+  };
+
+  const getRoleBadgeColor = () => {
+    if (role === "admin") return "bg-indigo-500/10 text-indigo-400 border-indigo-500/20";
+    return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+  };
 
   const NavLink = ({ href, label, icon: Icon, onClick }: any) => {
     const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
