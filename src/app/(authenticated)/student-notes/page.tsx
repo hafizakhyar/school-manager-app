@@ -38,7 +38,8 @@ export default function StudentNotesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectAll, setSelectAll] = useState(false);
 
-  // Ambil daftar kelas dari database
+  const todayStr = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -57,7 +58,6 @@ export default function StudentNotesPage() {
     fetchClasses();
   }, []);
 
-  // Ambil data siswa & catatan
   useEffect(() => {
     if (!selectedClass) return;
 
@@ -100,12 +100,14 @@ export default function StudentNotesPage() {
               recordsMap[studentId] = {
                 selected: false,
                 type: currentRecord.type || "Catatan Harian",
+                date: currentRecord.date || todayStr,
                 note: currentRecord.note || ""
               };
             } else {
               recordsMap[studentId] = {
                 selected: false,
                 type: "Catatan Harian",
+                date: todayStr,
                 note: ""
               };
             }
@@ -126,7 +128,6 @@ export default function StudentNotesPage() {
     fetchStudentsAndNotes();
   }, [selectedClass, academicYear, semester, classes]);
 
-  // Handle Pilih Semua / Batal Pilih Massal
   const handleToggleSelectAll = () => {
     const newSelectState = !selectAll;
     setSelectAll(newSelectState);
@@ -139,7 +140,6 @@ export default function StudentNotesPage() {
     });
   };
 
-  // Handle perubahan input per siswa
   const handleChangeField = (studentId: string, field: string, value: any) => {
     setNotesRecords(prev => ({
       ...prev,
@@ -150,7 +150,6 @@ export default function StudentNotesPage() {
     }));
   };
 
-  // Simpan data ke Firestore
   const handleSaveAll = async () => {
     setSaving(true);
     try {
@@ -166,6 +165,7 @@ export default function StudentNotesPage() {
             ...existingNotes,
             [docKey]: {
               type: dataToSave.type || "Catatan Harian",
+              date: dataToSave.date || todayStr,
               note: dataToSave.note || "",
               updatedAt: Timestamp.now()
             }
@@ -182,7 +182,6 @@ export default function StudentNotesPage() {
     }
   };
 
-  // Unggah CSV Simulasi
   const handleUploadCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -221,7 +220,6 @@ export default function StudentNotesPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
       <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Pilih Kelas</label>
@@ -276,7 +274,6 @@ export default function StudentNotesPage() {
         </div>
       </div>
 
-      {/* Tabel Catatan Siswa */}
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3, 4].map(n => <div key={n} className="h-16 w-full animate-pulse rounded-xl bg-slate-900" />)}
@@ -294,21 +291,22 @@ export default function StudentNotesPage() {
                   </th>
                   <th className="py-4 px-4 w-16">No</th>
                   <th className="py-4 px-6 min-w-[140px]">NIS</th>
-                  <th className="py-4 px-6 min-w-[220px]">Nama Siswa</th>
-                  <th className="py-4 px-6 min-w-[180px]">Jenis Catatan</th>
-                  <th className="py-4 px-6 min-w-[380px]">Isi Catatan / Keterangan</th>
+                  <th className="py-4 px-6 min-w-[200px]">Nama Siswa</th>
+                  <th className="py-4 px-6 min-w-[160px]">Jenis Catatan</th>
+                  <th className="py-4 px-6 min-w-[160px]">Tanggal Kejadian</th>
+                  <th className="py-4 px-6 min-w-[320px]">Isi Catatan / Keterangan</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500 text-sm">
+                    <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
                       Tidak ada data siswa ditemukan di kelas ini.
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((student, idx) => {
-                    const record = notesRecords[student.id] || { selected: false, type: "Catatan Harian", note: "" };
+                    const record = notesRecords[student.id] || { selected: false, type: "Catatan Harian", date: todayStr, note: "" };
 
                     return (
                       <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
@@ -325,7 +323,6 @@ export default function StudentNotesPage() {
                         <td className="py-4 px-6 text-xs text-slate-300 font-mono font-semibold">{student.nis}</td>
                         <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
 
-                        {/* Jenis Catatan */}
                         <td className="py-4 px-6">
                           <select 
                             value={record.type}
@@ -341,7 +338,15 @@ export default function StudentNotesPage() {
                           </select>
                         </td>
 
-                        {/* Isi Catatan */}
+                        <td className="py-4 px-6">
+                          <input 
+                            type="date"
+                            value={record.date}
+                            onChange={e => handleChangeField(student.id, "date", e.target.value)}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-medium"
+                          />
+                        </td>
+
                         <td className="py-4 px-6">
                           <input 
                             type="text"

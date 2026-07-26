@@ -38,7 +38,8 @@ export default function CounselingPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectAll, setSelectAll] = useState(false);
 
-  // Ambil daftar kelas dari database
+  const todayStr = new Date().toISOString().split('T')[0];
+
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -57,7 +58,6 @@ export default function CounselingPage() {
     fetchClasses();
   }, []);
 
-  // Ambil data siswa & konseling
   useEffect(() => {
     if (!selectedClass) return;
 
@@ -100,6 +100,7 @@ export default function CounselingPage() {
               recordsMap[studentId] = {
                 selected: false,
                 category: currentRecord.category || "Disiplin",
+                date: currentRecord.date || todayStr,
                 issue: currentRecord.issue || "",
                 action: currentRecord.action || ""
               };
@@ -107,6 +108,7 @@ export default function CounselingPage() {
               recordsMap[studentId] = {
                 selected: false,
                 category: "Disiplin",
+                date: todayStr,
                 issue: "",
                 action: ""
               };
@@ -128,7 +130,6 @@ export default function CounselingPage() {
     fetchStudentsAndCounseling();
   }, [selectedClass, academicYear, semester, classes]);
 
-  // Handle Pilih Semua / Batal Pilih Massal
   const handleToggleSelectAll = () => {
     const newSelectState = !selectAll;
     setSelectAll(newSelectState);
@@ -141,7 +142,6 @@ export default function CounselingPage() {
     });
   };
 
-  // Handle perubahan input per siswa
   const handleChangeField = (studentId: string, field: string, value: any) => {
     setCounselingRecords(prev => ({
       ...prev,
@@ -152,7 +152,6 @@ export default function CounselingPage() {
     }));
   };
 
-  // Simpan data ke Firestore
   const handleSaveAll = async () => {
     setSaving(true);
     try {
@@ -168,6 +167,7 @@ export default function CounselingPage() {
             ...existingCounseling,
             [docKey]: {
               category: dataToSave.category || "Disiplin",
+              date: dataToSave.date || todayStr,
               issue: dataToSave.issue || "",
               action: dataToSave.action || "",
               updatedAt: Timestamp.now()
@@ -185,7 +185,6 @@ export default function CounselingPage() {
     }
   };
 
-  // Unggah CSV Simulasi
   const handleUploadCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -224,7 +223,6 @@ export default function CounselingPage() {
         </div>
       </div>
 
-      {/* Filter Bar */}
       <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Pilih Kelas</label>
@@ -279,7 +277,6 @@ export default function CounselingPage() {
         </div>
       </div>
 
-      {/* Tabel Bimbingan Konseling */}
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3, 4].map(n => <div key={n} className="h-16 w-full animate-pulse rounded-xl bg-slate-900" />)}
@@ -299,20 +296,21 @@ export default function CounselingPage() {
                   <th className="py-4 px-6 min-w-[140px]">NIS</th>
                   <th className="py-4 px-6 min-w-[200px]">Nama Siswa</th>
                   <th className="py-4 px-6 min-w-[160px]">Kategori</th>
-                  <th className="py-4 px-6 min-w-[280px]">Permasalahan / Konsultasi</th>
-                  <th className="py-4 px-6 min-w-[280px]">Tindakan / Solusi</th>
+                  <th className="py-4 px-6 min-w-[160px]">Tanggal Kejadian</th>
+                  <th className="py-4 px-6 min-w-[260px]">Permasalahan / Konsultasi</th>
+                  <th className="py-4 px-6 min-w-[260px]">Tindakan / Solusi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
+                    <td colSpan={8} className="py-12 text-center text-slate-500 text-sm">
                       Tidak ada data siswa ditemukan di kelas ini.
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((student, idx) => {
-                    const record = counselingRecords[student.id] || { selected: false, category: "Disiplin", issue: "", action: "" };
+                    const record = counselingRecords[student.id] || { selected: false, category: "Disiplin", date: todayStr, issue: "", action: "" };
 
                     return (
                       <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
@@ -329,7 +327,6 @@ export default function CounselingPage() {
                         <td className="py-4 px-6 text-xs text-slate-300 font-mono font-semibold">{student.nis}</td>
                         <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
 
-                        {/* Kategori BK */}
                         <td className="py-4 px-6">
                           <select 
                             value={record.category}
@@ -343,7 +340,15 @@ export default function CounselingPage() {
                           </select>
                         </td>
 
-                        {/* Permasalahan */}
+                        <td className="py-4 px-6">
+                          <input 
+                            type="date"
+                            value={record.date}
+                            onChange={e => handleChangeField(student.id, "date", e.target.value)}
+                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-medium"
+                          />
+                        </td>
+
                         <td className="py-4 px-6">
                           <input 
                             type="text"
@@ -354,7 +359,6 @@ export default function CounselingPage() {
                           />
                         </td>
 
-                        {/* Tindakan / Solusi */}
                         <td className="py-4 px-6">
                           <input 
                             type="text"
