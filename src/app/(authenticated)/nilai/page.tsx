@@ -44,9 +44,10 @@ interface StudentRow {
   fullName: string;
   tugas1: number | "";
   tugas2: number | "";
-  bab1: number | "";
-  bab2: number | "";
-  bab3: number | "";
+  tugas3: number | "";
+  ph1: number | "";
+  ph2: number | "";
+  ph3: number | "";
   pts: number | "";
   finalExam: number | "";
   selected?: boolean;
@@ -183,7 +184,7 @@ export default function NilaiPage() {
           where("semester", "==", semester)
         ));
 
-        // Map: studentId -> { tugas1, tugas2, bab1, bab2, bab3, pts, finalExam }
+        // Map: studentId -> { tugas1, tugas2, tugas3, ph1, ph2, ph3, pts, finalExam }
         const studentGradesMap: Record<string, Record<string, number>> = {};
         existingSnap.forEach(d => {
           const data = d.data();
@@ -191,11 +192,12 @@ export default function NilaiPage() {
             studentGradesMap[data.studentId] = {};
           }
           const name = String(data.assessmentName || "").trim().toLowerCase();
-          if (name === "tugas 1") studentGradesMap[data.studentId]["tugas1"] = data.score;
-          if (name === "tugas 2") studentGradesMap[data.studentId]["tugas2"] = data.score;
-          if (name === "bab 1") studentGradesMap[data.studentId]["bab1"] = data.score;
-          if (name === "bab 2") studentGradesMap[data.studentId]["bab2"] = data.score;
-          if (name === "bab 3") studentGradesMap[data.studentId]["bab3"] = data.score;
+          if (name === "t1" || name === "tugas 1") studentGradesMap[data.studentId]["tugas1"] = data.score;
+          if (name === "t2" || name === "tugas 2") studentGradesMap[data.studentId]["tugas2"] = data.score;
+          if (name === "t3" || name === "tugas 3") studentGradesMap[data.studentId]["tugas3"] = data.score;
+          if (name === "ph1" || name === "bab 1") studentGradesMap[data.studentId]["ph1"] = data.score;
+          if (name === "ph2" || name === "bab 2") studentGradesMap[data.studentId]["ph2"] = data.score;
+          if (name === "ph3" || name === "bab 3") studentGradesMap[data.studentId]["ph3"] = data.score;
           if (name === "pts") studentGradesMap[data.studentId]["pts"] = data.score;
           if (name === "psas" || name === "psat" || name === "pas") studentGradesMap[data.studentId]["finalExam"] = data.score;
         });
@@ -209,9 +211,10 @@ export default function NilaiPage() {
             fullName: String(data.nama || data.fullName || "Tanpa Nama"),
             tugas1: sGrades["tugas1"] !== undefined ? sGrades["tugas1"] : "",
             tugas2: sGrades["tugas2"] !== undefined ? sGrades["tugas2"] : "",
-            bab1: sGrades["bab1"] !== undefined ? sGrades["bab1"] : "",
-            bab2: sGrades["bab2"] !== undefined ? sGrades["bab2"] : "",
-            bab3: sGrades["bab3"] !== undefined ? sGrades["bab3"] : "",
+            tugas3: sGrades["tugas3"] !== undefined ? sGrades["tugas3"] : "",
+            ph1: sGrades["ph1"] !== undefined ? sGrades["ph1"] : "",
+            ph2: sGrades["ph2"] !== undefined ? sGrades["ph2"] : "",
+            ph3: sGrades["ph3"] !== undefined ? sGrades["ph3"] : "",
             pts: sGrades["pts"] !== undefined ? sGrades["pts"] : "",
             finalExam: sGrades["finalExam"] !== undefined ? sGrades["finalExam"] : "",
             selected: false
@@ -394,6 +397,24 @@ export default function NilaiPage() {
     setStudents(prev => prev.map(s => s.id === studentId ? { ...s, [field]: numVal } : s));
   };
 
+  // Fungsi menghitung Rata-rata otomatis (hanya yang terisi / tidak kosong)
+  const calculateFinalAverage = (student: StudentRow) => {
+    const scores = [
+      student.tugas1,
+      student.tugas2,
+      student.tugas3,
+      student.ph1,
+      student.ph2,
+      student.ph3,
+      student.pts,
+      student.finalExam
+    ].filter((s): s is number => s !== "");
+
+    if (scores.length === 0) return "-";
+    const sum = scores.reduce((acc, curr) => acc + curr, 0);
+    return Math.round(sum / scores.length);
+  };
+
   const handleSaveAllGrades = async () => {
     if (students.length === 0) return;
 
@@ -406,11 +427,12 @@ export default function NilaiPage() {
 
       students.forEach((student) => {
         const fieldsToSave = [
-          { name: "Tugas 1", type: "Tugas", score: student.tugas1 },
-          { name: "Tugas 2", type: "Tugas", score: student.tugas2 },
-          { name: "Bab 1", type: "UlanganHarian", score: student.bab1 },
-          { name: "Bab 2", type: "UlanganHarian", score: student.bab2 },
-          { name: "Bab 3", type: "UlanganHarian", score: student.bab3 },
+          { name: "T1", type: "Tugas", score: student.tugas1 },
+          { name: "T2", type: "Tugas", score: student.tugas2 },
+          { name: "T3", type: "Tugas", score: student.tugas3 },
+          { name: "PH1", type: "UlanganHarian", score: student.ph1 },
+          { name: "PH2", type: "UlanganHarian", score: student.ph2 },
+          { name: "PH3", type: "UlanganHarian", score: student.ph3 },
           { name: "PTS", type: "PTS", score: student.pts },
           { name: examName, type: "PAS", score: student.finalExam },
         ];
@@ -507,7 +529,7 @@ export default function NilaiPage() {
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Nilai Siswa</h1>
           <p className="text-sm text-slate-400 mt-1">
-            Rekam hasil evaluasi akademis, tugas bab, PTS, dan rekap leger kelas.
+            Rekam hasil evaluasi akademis, tugas, penilaian harian, dan rekap leger kelas.
           </p>
         </div>
         
@@ -683,76 +705,103 @@ export default function NilaiPage() {
               <p className="text-sm font-medium">Tidak ada data siswa ditemukan untuk kelas ini.</p>
             </div>
           ) : (
-            <div className="rounded-2xl border border-slate-900 bg-slate-900/40 backdrop-blur-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-300">
-                  <thead className="bg-slate-900/80 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
-                    <tr>
-                      <th className="py-4 px-4 w-12 text-center">
-                        <button type="button" onClick={handleToggleSelectAll} className="text-slate-400 hover:text-white cursor-pointer">
-                          {selectAll ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
-                        </button>
-                      </th>
-                      <th className="py-4 px-4 w-16">No</th>
-                      <th className="py-4 px-4 min-w-[120px]">NISN</th>
-                      <th className="py-4 px-6 min-w-[220px]">Nama Siswa</th>
-                      <th className="py-4 px-3 w-20 text-center">Tugas 1</th>
-                      <th className="py-4 px-3 w-20 text-center">Tugas 2</th>
-                      <th className="py-4 px-3 w-20 text-center">Bab 1</th>
-                      <th className="py-4 px-3 w-20 text-center">Bab 2</th>
-                      <th className="py-4 px-3 w-20 text-center">Bab 3</th>
-                      <th className="py-4 px-3 w-20 text-center">PTS</th>
-                      <th className="py-4 px-3 w-24 text-center text-indigo-400">{finalExamLabel}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-900">
-                    {filteredStudents.map((student, idx) => (
-                      <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
-                        <td className="py-4 px-4 text-center">
-                          <button
-                            type="button"
-                            onClick={() => setStudents(prev => prev.map(s => s.id === student.id ? { ...s, selected: !s.selected } : s))}
-                            className="text-slate-500 hover:text-indigo-400 cursor-pointer"
-                          >
-                            {student.selected ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-900 bg-slate-900/40 backdrop-blur-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-300">
+                    <thead className="bg-slate-900/80 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                      <tr>
+                        <th className="py-4 px-4 w-12 text-center">
+                          <button type="button" onClick={handleToggleSelectAll} className="text-slate-400 hover:text-white cursor-pointer">
+                            {selectAll ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
                           </button>
-                        </td>
-                        <td className="py-4 px-4 font-medium text-slate-500">{idx + 1}</td>
-                        <td className="py-4 px-4 text-xs text-slate-300 font-mono font-semibold">{student.nisn}</td>
-                        <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
-
-                        {/* Tugas 1 */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.tugas1} onChange={e => handleFieldChange(student.id, "tugas1", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
-                        {/* Tugas 2 */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.tugas2} onChange={e => handleFieldChange(student.id, "tugas2", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
-                        {/* Bab 1 */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.bab1} onChange={e => handleFieldChange(student.id, "bab1", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
-                        {/* Bab 2 */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.bab2} onChange={e => handleFieldChange(student.id, "bab2", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
-                        {/* Bab 3 */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.bab3} onChange={e => handleFieldChange(student.id, "bab3", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
-                        {/* PTS */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.pts} onChange={e => handleFieldChange(student.id, "pts", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-amber-400 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
-                        {/* PSAS / PSAT */}
-                        <td className="py-4 px-3">
-                          <input type="number" min="0" max="100" placeholder="0" value={student.finalExam} onChange={e => handleFieldChange(student.id, "finalExam", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-indigo-400 outline-none focus:border-indigo-500 font-semibold" />
-                        </td>
+                        </th>
+                        <th className="py-4 px-4 w-16">No</th>
+                        <th className="py-4 px-4 min-w-[120px]">NISN</th>
+                        <th className="py-4 px-6 min-w-[220px]">Nama Siswa</th>
+                        <th className="py-4 px-3 w-20 text-center">T1</th>
+                        <th className="py-4 px-3 w-20 text-center">T2</th>
+                        <th className="py-4 px-3 w-20 text-center">T3</th>
+                        <th className="py-4 px-3 w-20 text-center">PH1</th>
+                        <th className="py-4 px-3 w-20 text-center">PH2</th>
+                        <th className="py-4 px-3 w-20 text-center">PH3</th>
+                        <th className="py-4 px-3 w-20 text-center">PTS</th>
+                        <th className="py-4 px-3 w-24 text-center text-indigo-400">{finalExamLabel}</th>
+                        <th className="py-4 px-4 w-28 text-center text-emerald-400 font-bold">Nilai Akhir</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-900">
+                      {filteredStudents.map((student, idx) => {
+                        const finalAvg = calculateFinalAverage(student);
+
+                        return (
+                          <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
+                            <td className="py-4 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setStudents(prev => prev.map(s => s.id === student.id ? { ...s, selected: !s.selected } : s))}
+                                className="text-slate-500 hover:text-indigo-400 cursor-pointer"
+                              >
+                                {student.selected ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
+                              </button>
+                            </td>
+                            <td className="py-4 px-4 font-medium text-slate-500">{idx + 1}</td>
+                            <td className="py-4 px-4 text-xs text-slate-300 font-mono font-semibold">{student.nisn}</td>
+                            <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
+
+                            {/* T1 */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.tugas1} onChange={e => handleFieldChange(student.id, "tugas1", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* T2 */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.tugas2} onChange={e => handleFieldChange(student.id, "tugas2", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* T3 */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.tugas3} onChange={e => handleFieldChange(student.id, "tugas3", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* PH1 */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.ph1} onChange={e => handleFieldChange(student.id, "ph1", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* PH2 */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.ph2} onChange={e => handleFieldChange(student.id, "ph2", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* PH3 */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.ph3} onChange={e => handleFieldChange(student.id, "ph3", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* PTS */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.pts} onChange={e => handleFieldChange(student.id, "pts", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-amber-400 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* PSAS / PSAT */}
+                            <td className="py-4 px-3">
+                              <input type="number" min="0" max="100" placeholder="0" value={student.finalExam} onChange={e => handleFieldChange(student.id, "finalExam", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-indigo-400 outline-none focus:border-indigo-500 font-semibold" />
+                            </td>
+                            {/* Nilai Akhir (Otomatis) */}
+                            <td className="py-4 px-4 text-center font-extrabold text-emerald-400 text-sm">
+                              {finalAvg}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Keterangan / Legenda di Bawah Halaman */}
+              <div className="rounded-2xl border border-slate-900 bg-slate-900/30 p-5 backdrop-blur-sm space-y-2 text-xs text-slate-400">
+                <p className="font-bold uppercase tracking-wider text-slate-300 mb-1">Keterangan Kolom Penilaian:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  <div><strong>T1, T2, T3</strong> : Tugas 1, Tugas 2, Tugas 3</div>
+                  <div><strong>PH1, PH2, PH3</strong> : Penilaian Harian Bab</div>
+                  <div><strong>PTS</strong> : Penilaian Tengah Semester</div>
+                  <div><strong>{finalExamLabel}</strong> : {semester === "Ganjil" ? "Penilaian Sumatif Akhir Semester (PSAS)" : "Penilaian Sumatif Akhir Tahun (PSAT)"}</div>
+                </div>
               </div>
             </div>
           )}
