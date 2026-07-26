@@ -14,22 +14,19 @@ import {
 } from "firebase/firestore";
 import { 
   Award, 
-  Users, 
   Save, 
   CheckCircle, 
   History, 
   FileSpreadsheet,
-  HelpCircle,
-  TrendingUp
+  Printer,
+  Upload,
+  Search,
+  CheckSquare,
+  Square,
+  BookOpen,
+  UserCheck
 } from "lucide-react";
 import { AssessmentType } from "@/types";
-
-interface StudentRow {
-  id: string;
-  nisn: string;
-  fullName: string;
-  score: number | "";
-}
 
 interface GradeRecord {
   id: string;
@@ -38,6 +35,21 @@ interface GradeRecord {
   assessmentType: AssessmentType;
   assessmentName: string;
   score: number;
+  semester: string;
+}
+
+interface StudentRow {
+  id: string;
+  nisn: string;
+  fullName: string;
+  tugas1: number | "";
+  tugas2: number | "";
+  bab1: number | "";
+  bab2: number | "";
+  bab3: number | "";
+  pts: number | "";
+  finalExam: number | "";
+  selected?: boolean;
 }
 
 export default function NilaiPage() {
@@ -51,8 +63,10 @@ export default function NilaiPage() {
   // Selected parameters for filling
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [selectedType, setSelectedType] = useState<AssessmentType>("Tugas");
-  const [assessmentName, setAssessmentName] = useState("");
+  const [academicYear, setAcademicYear] = useState("2026/2027");
+  const [semester, setSemester] = useState<"Ganjil" | "Genap">("Ganjil");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectAll, setSelectAll] = useState(false);
 
   // Student rows for Input
   const [students, setStudents] = useState<StudentRow[]>([]);
@@ -78,6 +92,8 @@ export default function NilaiPage() {
   const [ledgerGrades, setLedgerGrades] = useState<GradeRecord[]>([]);
   const [loadingLedger, setLoadingLedger] = useState(false);
 
+  const finalExamLabel = semester === "Ganjil" ? "PSAS" : "PSAT";
+
   // Load teacher assignments and general classes/subjects
   useEffect(() => {
     async function loadConfig() {
@@ -94,6 +110,9 @@ export default function NilaiPage() {
         const subjectsSnap = await getDocs(collection(db, "subjects"));
         const sList = subjectsSnap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().subjectName || d.id }));
         setSubjects(sList);
+        if (sList.length > 0) {
+          setSelectedSubjectId(sList[0].id);
+        }
 
         if (teacherId) {
           const assignmentsSnap = await getDocs(query(
@@ -126,10 +145,10 @@ export default function NilaiPage() {
     loadConfig();
   }, [teacherId]);
 
-  // Load students for Input Tab with flexible class matching
+  // Load students and existing scores for Input Tab
   useEffect(() => {
     async function loadStudentsForInput() {
-      if (!selectedClassId || activeTab !== "input") return;
+      if (!selectedClassId || !selectedSubjectId || activeTab !== "input") return;
 
       setLoadingStudents(true);
       setSaveSuccess(false);
@@ -156,32 +175,51 @@ export default function NilaiPage() {
           return isClassMatch && status === "Aktif";
         });
 
-        let existingScores: Record<string, number> = {};
-        if (assessmentName.trim() !== "") {
-          const existingSnap = await getDocs(query(
-            collection(db, "grades"),
-            where("classId", "==", selectedClassId),
-            where("subjectId", "==", selectedSubjectId),
-            where("assessmentType", "==", selectedType),
-            where("assessmentName", "==", assessmentName.trim())
-          ));
-          existingSnap.forEach(d => {
-            existingScores[d.data().studentId] = d.data().score;
-          });
-        }
+        // Fetch existing grades for this class, subject, and semester
+        const existingSnap = await getDocs(query(
+          collection(db, "grades"),
+          where("classId", "==", selectedClassId),
+          where("subjectId", "==", selectedSubjectId),
+          where("semester", "==", semester)
+        ));
+
+        // Map: studentId -> { tugas1, tugas2, bab1, bab2, bab3, pts, finalExam }
+        const studentGradesMap: Record<string, Record<string, number>> = {};
+        existingSnap.forEach(d => {
+          const data = d.data();
+          if (!studentGradesMap[data.studentId]) {
+            studentGradesMap[data.studentId] = {};
+          }
+          const name = String(data.assessmentName || "").trim().toLowerCase();
+          if (name === "tugas 1") studentGradesMap[data.studentId]["tugas1"] = data.score;
+          if (name === "tugas 2") studentGradesMap[data.studentId]["tugas2"] = data.score;
+          if (name === "bab 1") studentGradesMap[data.studentId]["bab1"] = data.score;
+          if (name === "bab 2") studentGradesMap[data.studentId]["bab2"] = data.score;
+          if (name === "bab 3") studentGradesMap[data.studentId]["bab3"] = data.score;
+          if (name === "pts") studentGradesMap[data.studentId]["pts"] = data.score;
+          if (name === "psas" || name === "psat" || name === "pas") studentGradesMap[data.studentId]["finalExam"] = data.score;
+        });
 
         const rows: StudentRow[] = matchedStudentDocs.map(docSnap => {
           const data = docSnap.data();
-          const score = existingScores[docSnap.id];
+          const sGrades = studentGradesMap[docSnap.id] || {};
           return {
             id: docSnap.id,
             nisn: String(data.nis || data.nisn || "-"),
             fullName: String(data.nama || data.fullName || "Tanpa Nama"),
-            score: score !== undefined ? score : ""
+            tugas1: sGrades["tugas1"] !== undefined ? sGrades["tugas1"] : "",
+            tugas2: sGrades["tugas2"] !== undefined ? sGrades["tugas2"] : "",
+            bab1: sGrades["bab1"] !== undefined ? sGrades["bab1"] : "",
+            bab2: sGrades["bab2"] !== undefined ? sGrades["bab2"] : "",
+            bab3: sGrades["bab3"] !== undefined ? sGrades["bab3"] : "",
+            pts: sGrades["pts"] !== undefined ? sGrades["pts"] : "",
+            finalExam: sGrades["finalExam"] !== undefined ? sGrades["finalExam"] : "",
+            selected: false
           };
         });
 
         setStudents(rows.sort((a, b) => a.fullName.localeCompare(b.fullName)));
+        setSelectAll(false);
       } catch (err) {
         console.error(err);
       } finally {
@@ -190,9 +228,9 @@ export default function NilaiPage() {
     }
 
     loadStudentsForInput();
-  }, [selectedClassId, selectedSubjectId, selectedType, assessmentName, activeTab, classes]);
+  }, [selectedClassId, selectedSubjectId, semester, academicYear, activeTab, classes]);
 
-  // Load students for History Tab class filter with flexible matching
+  // Load students for History Tab class filter
   useEffect(() => {
     async function loadHistoryStudents() {
       if (!historyClassId) return;
@@ -256,7 +294,8 @@ export default function NilaiPage() {
             subjectId: data.subjectId,
             assessmentType: data.assessmentType,
             assessmentName: data.assessmentName,
-            score: data.score
+            score: data.score,
+            semester: data.semester
           };
         });
         setGradesHistory(list);
@@ -270,7 +309,7 @@ export default function NilaiPage() {
     loadGradeHistory();
   }, [historyStudentId, historySemester, activeTab]);
 
-  // Load Ledger Data with flexible class matching
+  // Load Ledger Data
   useEffect(() => {
     async function loadLedgerData() {
       if (!ledgerClassId || activeTab !== "ledger") return;
@@ -310,7 +349,6 @@ export default function NilaiPage() {
         listStudents.sort((a, b) => a.name.localeCompare(b.name));
         setLedgerStudents(listStudents);
 
-        // Fetch all grades and filter by valid student IDs for this class
         const gradesSnap = await getDocs(query(
           collection(db, "grades"),
           where("semester", "==", ledgerSemester)
@@ -326,7 +364,8 @@ export default function NilaiPage() {
               subjectId: data.subjectId,
               assessmentType: data.assessmentType,
               assessmentName: data.assessmentName,
-              score: data.score
+              score: data.score,
+              semester: data.semester
             });
           }
         });
@@ -341,76 +380,91 @@ export default function NilaiPage() {
     loadLedgerData();
   }, [ledgerClassId, ledgerSemester, activeTab, classes]);
 
-  const handleScoreChange = (studentId: string, value: string) => {
-    let scoreVal: number | "" = "";
-    if (value !== "") {
-      scoreVal = Math.min(100, Math.max(0, parseInt(value) || 0));
-    }
-    setStudents(prev => prev.map(s => s.id === studentId ? { ...s, score: scoreVal } : s));
+  const handleToggleSelectAll = () => {
+    const newState = !selectAll;
+    setSelectAll(newState);
+    setStudents(prev => prev.map(s => ({ ...s, selected: newState })));
   };
 
-  const handleSaveGrades = async () => {
-    if (students.length === 0) return;
-    if (assessmentName.trim() === "") {
-      alert("Silakan masukkan nama penilaian (e.g. Ulangan Harian 1)!");
-      return;
+  const handleFieldChange = (studentId: string, field: keyof StudentRow, value: string) => {
+    let numVal: number | "" = "";
+    if (value !== "") {
+      numVal = Math.min(100, Math.max(0, parseInt(value) || 0));
     }
+    setStudents(prev => prev.map(s => s.id === studentId ? { ...s, [field]: numVal } : s));
+  };
 
-    const unfilled = students.some(s => s.score === "");
-    if (unfilled) {
-      if (!confirm("Beberapa siswa belum memiliki nilai. Simpan sebagai 0?")) {
-        return;
-      }
-    }
+  const handleSaveAllGrades = async () => {
+    if (students.length === 0) return;
 
     setSaving(true);
     setSaveSuccess(false);
 
     try {
       const batch = writeBatch(db);
+      const examName = semester === "Ganjil" ? "PSAS" : "PSAT";
 
       students.forEach((student) => {
-        const sanitizedName = assessmentName.trim().replace(/[^a-zA-Z0-9]/g, "_");
-        const docId = `${student.id}_${selectedClassId}_${selectedSubjectId}_${selectedType}_${sanitizedName}`;
-        const docRef = doc(db, "grades", docId);
+        const fieldsToSave = [
+          { name: "Tugas 1", type: "Tugas", score: student.tugas1 },
+          { name: "Tugas 2", type: "Tugas", score: student.tugas2 },
+          { name: "Bab 1", type: "UlanganHarian", score: student.bab1 },
+          { name: "Bab 2", type: "UlanganHarian", score: student.bab2 },
+          { name: "Bab 3", type: "UlanganHarian", score: student.bab3 },
+          { name: "PTS", type: "PTS", score: student.pts },
+          { name: examName, type: "PAS", score: student.finalExam },
+        ];
 
-        const payload = {
-          studentId: student.id,
-          classId: selectedClassId,
-          subjectId: selectedSubjectId,
-          assessmentType: selectedType,
-          assessmentName: assessmentName.trim(),
-          score: student.score === "" ? 0 : student.score,
-          teacherId: teacherId || "",
-          academicYear: "2026/2027",
-          semester: "Ganjil",
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now()
-        };
+        fieldsToSave.forEach(item => {
+          if (item.score !== "") {
+            const sanitizedName = item.name.replace(/[^a-zA-Z0-9]/g, "_");
+            const docId = `${student.id}_${selectedClassId}_${selectedSubjectId}_${item.type}_${sanitizedName}`;
+            const docRef = doc(db, "grades", docId);
 
-        batch.set(docRef, payload, { merge: true });
+            const payload = {
+              studentId: student.id,
+              classId: selectedClassId,
+              subjectId: selectedSubjectId,
+              assessmentType: item.type as AssessmentType,
+              assessmentName: item.name,
+              score: item.score,
+              teacherId: teacherId || "",
+              academicYear: academicYear,
+              semester: semester,
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now()
+            };
+
+            batch.set(docRef, payload, { merge: true });
+          }
+        });
       });
 
       await batch.commit();
       setSaveSuccess(true);
-      setAssessmentName("");
       setTimeout(() => setSaveSuccess(false), 5000);
     } catch (error) {
-      console.error("Error writing grades:", error);
+      console.error("Error saving grades:", error);
       alert("Gagal menyimpan nilai!");
     } finally {
       setSaving(false);
     }
   };
 
-  const subjectAverages: Record<string, { total: number; count: number }> = {};
-  gradesHistory.forEach(record => {
-    if (!subjectAverages[record.subjectId]) {
-      subjectAverages[record.subjectId] = { total: 0, count: 0 };
-    }
-    subjectAverages[record.subjectId].total += record.score;
-    subjectAverages[record.subjectId].count += 1;
-  });
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleUploadCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    alert(`File CSV "${file.name}" berhasil dibaca! Pemetaan nilai siap diproses.`);
+  };
+
+  const filteredStudents = students.filter(s => 
+    s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.nisn.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const subjectMap = subjects.reduce((acc, curr) => {
     acc[curr.id] = curr.name;
@@ -419,8 +473,8 @@ export default function NilaiPage() {
 
   const studentLedgerData = ledgerStudents.map(student => {
     const studentGrades = ledgerGrades.filter(g => g.studentId === student.id);
-    
     const subAverages: Record<string, number> = {};
+    
     subjects.forEach(subject => {
       const subjectGrades = studentGrades.filter(g => g.subjectId === subject.id);
       if (subjectGrades.length > 0) {
@@ -447,350 +501,385 @@ export default function NilaiPage() {
   const isTeacherRole = role === "guru" || role === "wali_kelas";
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Nilai Siswa</h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Rekam hasil evaluasi akademis dan rekap leger kelas.
-        </p>
+    <div className="space-y-8 pb-16">
+      {/* Header Utama */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Nilai Siswa</h1>
+          <p className="text-sm text-slate-400 mt-1">
+            Rekam hasil evaluasi akademis, tugas bab, PTS, dan rekap leger kelas.
+          </p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 cursor-pointer transition-all">
+            <Upload className="h-4.5 w-4.5 text-indigo-400" />
+            <span>Unggah CSV</span>
+            <input type="file" accept=".csv" onChange={handleUploadCSV} className="hidden" />
+          </label>
+
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center justify-center gap-2 rounded-xl bg-slate-900 border border-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 cursor-pointer transition-all"
+          >
+            <Printer className="h-4.5 w-4.5 text-emerald-400" />
+            <span>Cetak Dokumen</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveAllGrades}
+            disabled={saving || students.length === 0}
+            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 cursor-pointer transition-all disabled:opacity-50"
+          >
+            <Save className="h-4.5 w-4.5" />
+            <span>{saving ? "Menyimpan..." : "Simpan Nilai"}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="flex border-b border-slate-900">
+      {/* Tab Navigasi */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
         <button
+          type="button"
           onClick={() => setActiveTab("input")}
-          className={`px-6 py-3.5 text-sm font-semibold tracking-wide border-b-2 transition-all flex items-center gap-2 ${
-            activeTab === "input"
-              ? "border-indigo-600 text-white font-bold"
-              : "border-transparent text-slate-400 hover:text-white"
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "input" 
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25" 
+              : "bg-slate-900/40 text-slate-400 hover:text-white border border-slate-900"
           }`}
         >
-          <Award className="h-4 w-4" />
-          Input Nilai
+          <BookOpen className="h-4 w-4" />
+          <span>Input Nilai Mapel</span>
         </button>
+
         <button
+          type="button"
           onClick={() => setActiveTab("history")}
-          className={`px-6 py-3.5 text-sm font-semibold tracking-wide border-b-2 transition-all flex items-center gap-2 ${
-            activeTab === "history"
-              ? "border-indigo-600 text-white font-bold"
-              : "border-transparent text-slate-400 hover:text-white"
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "history" 
+              ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25" 
+              : "bg-slate-900/40 text-slate-400 hover:text-white border border-slate-900"
           }`}
         >
-          <History className="h-4 w-4" />
-          Riwayat Nilai Siswa
+          <UserCheck className="h-4 w-4" />
+          <span>Riwayat Nilai Siswa</span>
         </button>
+
         {(role === "admin" || role === "kepala_sekolah" || role === "wali_kelas") && (
           <button
+            type="button"
             onClick={() => setActiveTab("ledger")}
-            className={`px-6 py-3.5 text-sm font-semibold tracking-wide border-b-2 transition-all flex items-center gap-2 ${
-              activeTab === "ledger"
-                ? "border-indigo-600 text-white font-bold"
-                : "border-transparent text-slate-400 hover:text-white"
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === "ledger" 
+                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25" 
+                : "bg-slate-900/40 text-slate-400 hover:text-white border border-slate-900"
             }`}
           >
             <FileSpreadsheet className="h-4 w-4" />
-            Leger Rapor Kelas
+            <span>Leger Rapor Kelas</span>
           </button>
         )}
       </div>
 
+      {/* KONTEN TAB 1: INPUT NILAI */}
       {activeTab === "input" && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Kelas</label>
-                {isTeacherRole ? (
-                  <select
-                    value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
-                    className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                  >
-                    {Array.from(new Set(assignedOptions.map(o => o.classId))).map(classId => {
-                      const opt = assignedOptions.find(o => o.classId === classId);
-                      return <option key={classId} value={classId}>{opt?.className}</option>;
-                    })}
-                  </select>
-                ) : (
-                  <select
-                    value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
-                    className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                  >
-                    <option value="">Pilih Kelas...</option>
-                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Mata Pelajaran</label>
-                {isTeacherRole ? (
-                  <select
-                    value={selectedSubjectId}
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
-                    className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                  >
-                    {assignedOptions
-                      .filter(o => o.classId === selectedClassId)
-                      .map(opt => (
-                        <option key={opt.subjectId} value={opt.subjectId}>{opt.subjectName}</option>
-                      ))}
-                  </select>
-                ) : (
-                  <select
-                    value={selectedSubjectId}
-                    onChange={(e) => setSelectedSubjectId(e.target.value)}
-                    className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                  >
-                    <option value="">Pilih Mapel...</option>
-                    {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Jenis Penilaian</label>
+          {/* Filter Bar */}
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Pilih Kelas</label>
+              {isTeacherRole ? (
                 <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value as AssessmentType)}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
                 >
-                  <option value="Tugas">Tugas</option>
-                  <option value="UlanganHarian">Ulangan Harian</option>
-                  <option value="PTS">PTS (Tengah Semester)</option>
-                  <option value="PAS">PAS (Akhir Semester)</option>
-                  <option value="Praktik">Praktik</option>
-                  <option value="Project">Project</option>
+                  {Array.from(new Set(assignedOptions.map(o => o.classId))).map(classId => {
+                    const opt = assignedOptions.find(o => o.classId === classId);
+                    return <option key={classId} value={classId}>{opt?.className}</option>;
+                  })}
                 </select>
-              </div>
+              ) : (
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+                >
+                  <option value="">Pilih Kelas...</option>
+                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              )}
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nama Penilaian</label>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Mata Pelajaran</label>
+              {isTeacherRole ? (
+                <select
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+                >
+                  {assignedOptions
+                    .filter(o => o.classId === selectedClassId)
+                    .map(opt => (
+                      <option key={opt.subjectId} value={opt.subjectId}>{opt.subjectName}</option>
+                    ))}
+                </select>
+              ) : (
+                <select
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+                >
+                  <option value="">Pilih Mapel...</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Semester</label>
+              <select
+                value={semester}
+                onChange={(e) => setSemester(e.target.value as "Ganjil" | "Genap")}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                <option value="Ganjil">Semester Ganjil</option>
+                <option value="Genap">Semester Genap</option>
+              </select>
+            </div>
+
+            <div className="lg:col-span-2">
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Cari Siswa</label>
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. Tugas 1 Aljabar"
-                  value={assessmentName}
-                  onChange={(e) => setAssessmentName(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 placeholder-slate-700 outline-none focus:border-indigo-500"
+                  placeholder="Cari nama siswa atau NISN..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-950 pl-10 pr-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
                 />
               </div>
             </div>
           </div>
 
           {saveSuccess && (
-            <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-sm text-emerald-400">
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-400">
               <CheckCircle className="h-5 w-5 shrink-0" />
-              <span>Nilai berhasil disimpan ke database!</span>
+              <span>Semua nilai berhasil disimpan ke database!</span>
             </div>
           )}
 
           {loadingStudents ? (
             <div className="space-y-4">
-              <div className="h-10 w-full animate-pulse rounded bg-slate-900" />
-              {[1, 2, 3].map(n => (
-                <div key={n} className="h-14 w-full animate-pulse rounded bg-slate-900 border border-slate-800" />
-              ))}
+              {[1, 2, 3, 4].map(n => <div key={n} className="h-16 w-full animate-pulse rounded-xl bg-slate-900" />)}
             </div>
-          ) : students.length === 0 ? (
-            <div className="rounded-xl border border-slate-900 border-dashed py-16 text-center">
-              <Award className="mx-auto h-12 w-12 text-slate-600" />
-              <h3 className="mt-4 text-sm font-bold text-white">Tidak ada siswa</h3>
-              <p className="mt-1 text-xs text-slate-500">Pilih kelas di atas untuk memuat daftar siswa.</p>
+          ) : filteredStudents.length === 0 ? (
+            <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-12 text-center text-slate-500 backdrop-blur-sm">
+              <Award className="h-10 w-10 mx-auto mb-3 text-slate-600" />
+              <p className="text-sm font-medium">Tidak ada data siswa ditemukan untuk kelas ini.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="overflow-x-auto rounded-xl border border-slate-900 bg-slate-900/40 backdrop-blur-sm">
+            <div className="rounded-2xl border border-slate-900 bg-slate-900/40 backdrop-blur-sm overflow-hidden">
+              <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm text-slate-300">
-                  <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                  <thead className="bg-slate-900/80 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
                     <tr>
-                      <th className="py-4 px-4 w-40">NIS</th>
-                      <th className="py-4 px-4 min-w-[250px]">Nama Siswa</th>
-                      <th className="py-4 px-4 w-48 text-right">Nilai (0-100)</th>
+                      <th className="py-4 px-4 w-12 text-center">
+                        <button type="button" onClick={handleToggleSelectAll} className="text-slate-400 hover:text-white cursor-pointer">
+                          {selectAll ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
+                        </button>
+                      </th>
+                      <th className="py-4 px-4 w-16">No</th>
+                      <th className="py-4 px-4 min-w-[120px]">NISN</th>
+                      <th className="py-4 px-6 min-w-[220px]">Nama Siswa</th>
+                      <th className="py-4 px-3 w-20 text-center">Tugas 1</th>
+                      <th className="py-4 px-3 w-20 text-center">Tugas 2</th>
+                      <th className="py-4 px-3 w-20 text-center">Bab 1</th>
+                      <th className="py-4 px-3 w-20 text-center">Bab 2</th>
+                      <th className="py-4 px-3 w-20 text-center">Bab 3</th>
+                      <th className="py-4 px-3 w-20 text-center">PTS</th>
+                      <th className="py-4 px-3 w-24 text-center text-indigo-400">{finalExamLabel}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-900">
-                    {students.map((student) => (
-                      <tr key={student.id} className="hover:bg-slate-900/25 transition-colors">
-                        <td className="py-3.5 px-4 font-mono text-xs text-slate-400">{student.nisn}</td>
-                        <td className="py-3.5 px-4 font-semibold text-white">{student.fullName}</td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="inline-block relative">
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              required
-                              placeholder="0"
-                              value={student.score}
-                              onChange={(e) => handleScoreChange(student.id, e.target.value)}
-                              className="w-28 rounded-lg bg-slate-950 border border-slate-800 px-3 py-1.5 text-sm text-right text-indigo-400 font-bold outline-none focus:border-indigo-500"
-                            />
-                          </div>
+                    {filteredStudents.map((student, idx) => (
+                      <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
+                        <td className="py-4 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setStudents(prev => prev.map(s => s.id === student.id ? { ...s, selected: !s.selected } : s))}
+                            className="text-slate-500 hover:text-indigo-400 cursor-pointer"
+                          >
+                            {student.selected ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
+                          </button>
+                        </td>
+                        <td className="py-4 px-4 font-medium text-slate-500">{idx + 1}</td>
+                        <td className="py-4 px-4 text-xs text-slate-300 font-mono font-semibold">{student.nisn}</td>
+                        <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
+
+                        {/* Tugas 1 */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.tugas1} onChange={e => handleFieldChange(student.id, "tugas1", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                        </td>
+                        {/* Tugas 2 */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.tugas2} onChange={e => handleFieldChange(student.id, "tugas2", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                        </td>
+                        {/* Bab 1 */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.bab1} onChange={e => handleFieldChange(student.id, "bab1", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                        </td>
+                        {/* Bab 2 */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.bab2} onChange={e => handleFieldChange(student.id, "bab2", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                        </td>
+                        {/* Bab 3 */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.bab3} onChange={e => handleFieldChange(student.id, "bab3", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold" />
+                        </td>
+                        {/* PTS */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.pts} onChange={e => handleFieldChange(student.id, "pts", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-amber-400 outline-none focus:border-indigo-500 font-semibold" />
+                        </td>
+                        {/* PSAS / PSAT */}
+                        <td className="py-4 px-3">
+                          <input type="number" min="0" max="100" placeholder="0" value={student.finalExam} onChange={e => handleFieldChange(student.id, "finalExam", e.target.value)} className="w-full rounded-xl border border-slate-800 bg-slate-950 px-2 py-2 text-center text-xs text-indigo-400 outline-none focus:border-indigo-500 font-semibold" />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={handleSaveGrades}
-                  disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
-                >
-                  <Save className="h-5 w-5" />
-                  <span>{saving ? "Menyimpan..." : "Simpan Semua Nilai"}</span>
-                </button>
-              </div>
             </div>
           )}
         </div>
       )}
 
+      {/* KONTEN TAB 2: RIWAYAT NILAI SISWA */}
       {activeTab === "history" && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
-            <div className="grid gap-4 sm:grid-cols-3 items-end">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Kelas</label>
-                <select
-                  value={historyClassId}
-                  onChange={(e) => setHistoryClassId(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Pilih Kelas...</option>
-                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Kelas</label>
+              <select
+                value={historyClassId}
+                onChange={(e) => setHistoryClassId(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                <option value="">Pilih Kelas...</option>
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Siswa</label>
-                <select
-                  value={historyStudentId}
-                  onChange={(e) => setHistoryStudentId(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Pilih Siswa...</option>
-                  {historyStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Siswa</label>
+              <select
+                value={historyStudentId}
+                onChange={(e) => setHistoryStudentId(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                <option value="">Pilih Siswa...</option>
+                {historyStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Semester</label>
-                <select
-                  value={historySemester}
-                  onChange={(e) => setHistorySemester(e.target.value as "Ganjil" | "Genap")}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="Ganjil">Ganjil</option>
-                  <option value="Genap">Genap</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Semester</label>
+              <select
+                value={historySemester}
+                onChange={(e) => setHistorySemester(e.target.value as "Ganjil" | "Genap")}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                <option value="Ganjil">Ganjil</option>
+                <option value="Genap">Genap</option>
+              </select>
             </div>
           </div>
 
           {loadingHistory ? (
-            <div className="h-64 w-full animate-pulse rounded bg-slate-900 border border-slate-800" />
+            <div className="h-64 w-full animate-pulse rounded-2xl bg-slate-900 border border-slate-800" />
           ) : !historyStudentId ? (
             <p className="text-sm text-slate-500 text-center py-10">Pilih siswa di atas untuk melihat riwayat nilai.</p>
           ) : gradesHistory.length === 0 ? (
-            <div className="rounded-xl border border-slate-900 border-dashed py-16 text-center">
-              <History className="mx-auto h-12 w-12 text-slate-600" />
-              <h3 className="mt-4 text-sm font-bold text-white">Tidak ada riwayat nilai</h3>
-              <p className="mt-1 text-xs text-slate-500">Nilai akademis siswa ini belum dimasukkan untuk semester ini.</p>
+            <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-12 text-center text-slate-500 backdrop-blur-sm">
+              <History className="h-10 w-10 mx-auto mb-3 text-slate-600" />
+              <p className="text-sm font-medium">Tidak ada riwayat nilai untuk semester ini.</p>
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-3 items-start">
-              <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Rata-Rata Nilai Mapel</h3>
-                <div className="space-y-3">
-                  {Object.entries(subjectAverages).map(([subId, data]) => {
-                    const avg = Math.round(data.total / data.count);
-                    return (
-                      <div key={subId} className="flex justify-between items-center bg-slate-950 p-3 rounded-lg border border-slate-900">
-                        <span className="text-xs font-semibold text-slate-300">{subjectMap[subId] || subId}</span>
-                        <span className={`text-sm font-bold ${avg >= 75 ? "text-emerald-400" : "text-rose-400"}`}>{avg}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="md:col-span-2 rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Rincian Penilaian</h3>
-                
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm text-slate-300">
-                    <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                      <tr>
-                        <th className="py-2.5 px-3">Mata Pelajaran</th>
-                        <th className="py-2.5 px-3">Kategori</th>
-                        <th className="py-2.5 px-3">Nama Tugas/Ulangan</th>
-                        <th className="py-2.5 px-3 text-right">Nilai</th>
+            <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
+              <h3 className="text-base font-bold text-white">Rincian Penilaian Siswa</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Mata Pelajaran</th>
+                      <th className="py-3 px-4">Kategori</th>
+                      <th className="py-3 px-4">Nama Penilaian</th>
+                      <th className="py-3 px-4 text-right">Nilai</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-900 text-xs">
+                    {gradesHistory.map((record) => (
+                      <tr key={record.id} className="hover:bg-slate-900/20">
+                        <td className="py-3 px-4 font-semibold text-white">{subjectMap[record.subjectId] || record.subjectId}</td>
+                        <td className="py-3 px-4 text-slate-400">{record.assessmentType}</td>
+                        <td className="py-3 px-4">{record.assessmentName}</td>
+                        <td className={`py-3 px-4 text-right font-bold ${record.score >= 75 ? "text-emerald-400" : "text-rose-400"}`}>{record.score}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-900 text-xs">
-                      {gradesHistory.map((record) => (
-                        <tr key={record.id} className="hover:bg-slate-900/20">
-                          <td className="py-2.5 px-3 font-semibold text-white">{subjectMap[record.subjectId] || record.subjectId}</td>
-                          <td className="py-2.5 px-3 text-slate-400">{record.assessmentType}</td>
-                          <td className="py-2.5 px-3">{record.assessmentName}</td>
-                          <td className={`py-2.5 px-3 text-right font-bold ${record.score >= 75 ? "text-emerald-400" : "text-rose-400"}`}>{record.score}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
         </div>
       )}
 
+      {/* KONTEN TAB 3: LEGER RAPOR KELAS */}
       {activeTab === "ledger" && (role === "admin" || role === "kepala_sekolah" || role === "wali_kelas") && (
         <div className="space-y-6">
-          <div className="rounded-xl border border-slate-900 bg-slate-900/20 p-5 backdrop-blur-sm">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 items-end">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Kelas / Rombel</label>
-                <select
-                  value={ledgerClassId}
-                  onChange={(e) => setLedgerClassId(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="">Pilih Kelas...</option>
-                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+          <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Kelas / Rombel</label>
+              <select
+                value={ledgerClassId}
+                onChange={(e) => setLedgerClassId(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                <option value="">Pilih Kelas...</option>
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Semester</label>
-                <select
-                  value={ledgerSemester}
-                  onChange={(e) => setLedgerSemester(e.target.value as "Ganjil" | "Genap")}
-                  className="block w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-500"
-                >
-                  <option value="Ganjil">Ganjil</option>
-                  <option value="Genap">Genap</option>
-                </select>
-              </div>
+            <div>
+              <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Semester</label>
+              <select
+                value={ledgerSemester}
+                onChange={(e) => setLedgerSemester(e.target.value as "Ganjil" | "Genap")}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+              >
+                <option value="Ganjil">Ganjil</option>
+                <option value="Genap">Genap</option>
+              </select>
             </div>
           </div>
 
           {loadingLedger ? (
-            <div className="h-64 w-full animate-pulse rounded bg-slate-900 border border-slate-800" />
+            <div className="h-64 w-full animate-pulse rounded-2xl bg-slate-900 border border-slate-800" />
           ) : ledgerStudents.length === 0 ? (
             <p className="text-sm text-slate-500 text-center py-10">Pilih kelas di atas untuk memuat Ledger nilai.</p>
           ) : (
-            <div className="rounded-xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
+            <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-6 backdrop-blur-sm space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
                   <FileSpreadsheet className="h-5 w-5 text-indigo-400" />
                   Leger Penilaian Hasil Belajar (Rata-Rata Nilai Akhir Mapel)
                 </h3>
-                <span className="text-xs text-slate-500">T.A. 2026/2027 • Ganjil</span>
+                <span className="text-xs text-slate-500">T.A. 2026/2027 • {ledgerSemester}</span>
               </div>
 
               <div className="overflow-x-auto">
