@@ -12,7 +12,7 @@ import {
   where, 
   Timestamp 
 } from "firebase/firestore";
-import { Wallet, CheckCircle2, XCircle, Search, Save, Calendar, Filter } from "lucide-react";
+import { Wallet, CheckCircle2, XCircle, Search, Save } from "lucide-react";
 
 interface Student {
   id: string;
@@ -53,7 +53,6 @@ export default function TuitionFeesPage() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Ambil daftar kelas
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -72,7 +71,6 @@ export default function TuitionFeesPage() {
     fetchClasses();
   }, []);
 
-  // Ambil data siswa & data keuangan berdasarkan Kelas + Tahun Ajaran + Semester
   useEffect(() => {
     if (!selectedClass) return;
 
@@ -89,10 +87,10 @@ export default function TuitionFeesPage() {
         studentList.sort((a, b) => a.fullName.localeCompare(b.fullName));
         setStudents(studentList);
 
+        const safeYear = academicYear.replace("/", "-");
         const feesMap: { [studentId: string]: any } = {};
         for (const student of studentList) {
-          // Dokumen unik per siswa per tahun ajaran & semester
-          const docKey = `${student.id}_${academicYear.replace("/", "-")}_${semester}`;
+          const docKey = `${student.id}_${safeYear}_${semester}`;
           const feeDocRef = doc(db, "tuitionFees", docKey);
           const feeSnap = await getDoc(feeDocRef);
           
@@ -122,7 +120,6 @@ export default function TuitionFeesPage() {
     fetchStudentsAndFees();
   }, [selectedClass, academicYear, semester]);
 
-  // Toggle status pembayaran lokal
   const handleToggle = (studentId: string, field: string, monthKey?: string) => {
     setFeesData(prev => {
       const studentRecord = { ...prev[studentId] };
@@ -138,12 +135,12 @@ export default function TuitionFeesPage() {
     });
   };
 
-  // Simpan massal ke Firebase
   const handleSaveAll = async () => {
     setSaving(true);
     try {
+      const safeYear = academicYear.replace("/", "-");
       for (const student of students) {
-        const docKey = `${student.id}_${academicYear.replace("/", "-")}_${semester}`;
+        const docKey = `${student.id}_${safeYear}_${semester}`;
         const docRef = doc(db, "tuitionFees", docKey);
         const dataToSave = feesData[student.id] || {};
 
@@ -159,7 +156,7 @@ export default function TuitionFeesPage() {
       alert("Semua data keuangan & SPP berhasil disimpan!");
     } catch (err) {
       console.error("Gagal menyimpan:", err);
-      alert("Terjadi kesalahan saat menyimpan data.");
+      alert("Terjadi kesalahan saat menyimpan data ke database.");
     } finally {
       setSaving(false);
     }
@@ -191,7 +188,6 @@ export default function TuitionFeesPage() {
         </button>
       </div>
 
-      {/* Filter Bar */}
       <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Pilih Kelas</label>
@@ -246,7 +242,6 @@ export default function TuitionFeesPage() {
         </div>
       </div>
 
-      {/* Tabel Keuangan */}
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(n => <div key={n} className="h-20 w-full animate-pulse rounded-xl bg-slate-900" />)}
@@ -285,7 +280,6 @@ export default function TuitionFeesPage() {
                           <span className="block text-xs font-normal text-slate-500">NIS: {student.nis || "-"}</span>
                         </td>
 
-                        {/* Uang Pangkal */}
                         <td className="py-4 px-6 text-center">
                           <button 
                             type="button"
@@ -301,7 +295,6 @@ export default function TuitionFeesPage() {
                           </button>
                         </td>
 
-                        {/* Uang Pendidikan */}
                         <td className="py-4 px-6 text-center">
                           <button 
                             type="button"
@@ -317,7 +310,6 @@ export default function TuitionFeesPage() {
                           </button>
                         </td>
 
-                        {/* Iuran Akhirussanah Kelas 12 */}
                         {isGrade12 && (
                           <td className="py-4 px-6 text-center">
                             <button 
@@ -335,7 +327,6 @@ export default function TuitionFeesPage() {
                           </td>
                         )}
 
-                        {/* SPP Bulanan (Jan - Des) */}
                         <td className="py-4 px-6">
                           <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
                             {MONTHS.map(m => {
