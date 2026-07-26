@@ -10,7 +10,7 @@ import {
   query, 
   Timestamp 
 } from "firebase/firestore";
-import { BookOpenCheck, Search, Save, Upload, CheckSquare, Square, CheckCircle2 } from "lucide-react";
+import { BookOpenCheck, Search, Save, Upload, CheckSquare, Square } from "lucide-react";
 
 interface Student {
   id: string;
@@ -93,7 +93,7 @@ export default function TahfizPage() {
             studentList.push({ 
               id: studentId, 
               fullName: data.fullName || data.name || "Tanpa Nama", 
-              nis: data.nis || "-", 
+              nis: data.nis || data.nisn || "-", 
               classId: sClassId,
               tahfizData: data.tahfizData || {}
             });
@@ -334,7 +334,7 @@ export default function TahfizPage() {
                           </button>
                         </td>
                         <td className="py-4 px-4 font-medium text-slate-500">{idx + 1}</td>
-                        <td className="py-4 px-6 text-xs text-slate-400 font-mono">{student.nis}</td>
+                        <td className="py-4 px-6 text-xs text-slate-300 font-mono font-semibold">{student.nis}</td>
                         <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
 
                         {/* Pilihan Juz */}
