@@ -38,7 +38,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
   const baseLinks = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/jurnal-mengajar", label: "Jurnal Mengajar", icon: BookOpen },
-    { href: "/absensi", label: "Daftar Hadir / Absensi", icon: CalendarCheck },
+    { href: "/absensi", label: "Daftar Hadir", icon: CalendarCheck },
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
@@ -102,9 +102,9 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       {/* Sidebar - Desktop */}
       <aside className="hidden w-72 shrink-0 border-r border-slate-900 bg-slate-900/40 backdrop-blur-md lg:block">
         <div className="flex h-16 items-center gap-3 border-b border-slate-900 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 shadow-md shadow-indigo-600/20">
-            <GraduationCap className="h-5 w-5 text-white" />
-          </div>
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden">
+  <img src="/logo.png" alt="Logo Sekolah" className="h-full w-full object-contain" />
+</div>
           <div>
             <span className="font-bold text-white tracking-wide text-sm block">AL-JANNAH</span>
             <span className="text-[10px] text-indigo-400 font-semibold uppercase tracking-wider block">School Manager</span>
