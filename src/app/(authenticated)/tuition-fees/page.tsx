@@ -12,7 +12,7 @@ import {
   where, 
   Timestamp 
 } from "firebase/firestore";
-import { Wallet, CheckCircle2, XCircle, Search, Filter } from "lucide-react";
+import { Wallet, CheckCircle2, XCircle, Search, Save, Calendar, Filter } from "lucide-react";
 
 interface Student {
   id: string;
@@ -24,25 +24,36 @@ interface Student {
 interface ClassItem {
   id: string;
   name: string;
-  className?: string;
 }
 
-interface FeeRecord {
-  uangPangkal: boolean;
-  uangPendidikan: boolean;
-  spp: boolean;
-  iuranAkhirussanah: boolean;
-}
+const MONTHS = [
+  { id: "jan", label: "Jan" },
+  { id: "feb", label: "Feb" },
+  { id: "mar", label: "Mar" },
+  { id: "apr", label: "Apr" },
+  { id: "mei", label: "Mei" },
+  { id: "jun", label: "Jun" },
+  { id: "jul", label: "Jul" },
+  { id: "agu", label: "Ags" },
+  { id: "sep", label: "Sep" },
+  { id: "okt", label: "Okt" },
+  { id: "nov", label: "Nov" },
+  { id: "des", label: "Des" },
+];
 
 export default function TuitionFeesPage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>("");
+  const [academicYear, setAcademicYear] = useState<string>("2026/2027");
+  const [semester, setSemester] = useState<string>("Ganjil");
+  
   const [students, setStudents] = useState<Student[]>([]);
-  const [feesData, setFeesData] = useState<{ [studentId: string]: FeeRecord }>({});
+  const [feesData, setFeesData] = useState<{ [studentId: string]: any }>({});
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Ambil daftar kelas saat pertama muat
+  // Ambil daftar kelas
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -61,14 +72,13 @@ export default function TuitionFeesPage() {
     fetchClasses();
   }, []);
 
-  // Ambil data siswa dan status pembayaran berdasarkan kelas yang dipilih
+  // Ambil data siswa & data keuangan berdasarkan Kelas + Tahun Ajaran + Semester
   useEffect(() => {
     if (!selectedClass) return;
 
     const fetchStudentsAndFees = async () => {
       setLoading(true);
       try {
-        // 1. Ambil siswa di kelas tersebut
         const q = query(collection(db, "students"), where("classId", "==", selectedClass));
         const studentSnap = await getDocs(q);
         const studentList: Student[] = [];
@@ -79,69 +89,82 @@ export default function TuitionFeesPage() {
         studentList.sort((a, b) => a.fullName.localeCompare(b.fullName));
         setStudents(studentList);
 
-        // 2. Ambil data keuangan dari koleksi tuitionFees
-        const feesMap: { [studentId: string]: FeeRecord } = {};
+        const feesMap: { [studentId: string]: any } = {};
         for (const student of studentList) {
-          const feeDocRef = doc(db, "tuitionFees", student.id);
+          // Dokumen unik per siswa per tahun ajaran & semester
+          const docKey = `${student.id}_${academicYear.replace("/", "-")}_${semester}`;
+          const feeDocRef = doc(db, "tuitionFees", docKey);
           const feeSnap = await getDoc(feeDocRef);
+          
           if (feeSnap.exists()) {
-            const data = feeSnap.data();
-            feesMap[student.id] = {
-              uangPangkal: !!data.uangPangkal,
-              uangPendidikan: !!data.uangPendidikan,
-              spp: !!data.spp,
-              iuranAkhirussanah: !!data.iuranAkhirussanah,
-            };
+            feesMap[student.id] = feeSnap.data();
           } else {
-            // Default belum bayar
             feesMap[student.id] = {
               uangPangkal: false,
               uangPendidikan: false,
-              spp: false,
               iuranAkhirussanah: false,
+              sppMonths: {
+                jan: false, feb: false, mar: false, apr: false,
+                mei: false, jun: false, jul: false, agu: false,
+                sep: false, okt: false, nov: false, des: false
+              }
             };
           }
         }
         setFeesData(feesMap);
       } catch (err) {
-        console.error("Gagal memuat data keuangan:", err);
+        console.error("Gagal memuat data:", err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchStudentsAndFees();
-  }, [selectedClass]);
+  }, [selectedClass, academicYear, semester]);
 
-  // Fungsi mengubah status pembayaran dan langsung simpan ke Firestore
-  const handleToggleFee = async (studentId: string, field: keyof FeeRecord) => {
-    const currentRecord = feesData[studentId] || { uangPangkal: false, uangPendidikan: false, spp: false, iuranAkhirussanah: false };
-    const updatedRecord = {
-      ...currentRecord,
-      [field]: !currentRecord[field],
-    };
+  // Toggle status pembayaran lokal
+  const handleToggle = (studentId: string, field: string, monthKey?: string) => {
+    setFeesData(prev => {
+      const studentRecord = { ...prev[studentId] };
+      if (monthKey) {
+        studentRecord.sppMonths = {
+          ...studentRecord.sppMonths,
+          [monthKey]: !studentRecord.sppMonths[monthKey]
+        };
+      } else {
+        studentRecord[field] = !studentRecord[field];
+      }
+      return { ...prev, [studentId]: studentRecord };
+    });
+  };
 
-    // Update state lokal seketika
-    setFeesData(prev => ({
-      ...prev,
-      [studentId]: updatedRecord
-    }));
-
+  // Simpan massal ke Firebase
+  const handleSaveAll = async () => {
+    setSaving(true);
     try {
-      const docRef = doc(db, "tuitionFees", studentId);
-      await setDoc(docRef, {
-        studentId,
-        classId: selectedClass,
-        ...updatedRecord,
-        updatedAt: Timestamp.now()
-      }, { merge: true });
+      for (const student of students) {
+        const docKey = `${student.id}_${academicYear.replace("/", "-")}_${semester}`;
+        const docRef = doc(db, "tuitionFees", docKey);
+        const dataToSave = feesData[student.id] || {};
+
+        await setDoc(docRef, {
+          studentId: student.id,
+          classId: selectedClass,
+          academicYear,
+          semester,
+          ...dataToSave,
+          updatedAt: Timestamp.now()
+        }, { merge: true });
+      }
+      alert("Semua data keuangan & SPP berhasil disimpan!");
     } catch (err) {
-      console.error("Gagal memperbarui status pembayaran:", err);
-      alert("Gagal menyimpan perubahan ke database.");
+      console.error("Gagal menyimpan:", err);
+      alert("Terjadi kesalahan saat menyimpan data.");
+    } finally {
+      setSaving(false);
     }
   };
 
-  // Cek apakah kelas yang dipilih adalah kelas 12 (berdasarkan nama kelas mengandung "12" atau "XII")
   const currentClassName = classes.find(c => c.id === selectedClass)?.name || "";
   const isGrade12 = currentClassName.includes("12") || currentClassName.toUpperCase().includes("XII");
 
@@ -151,22 +174,31 @@ export default function TuitionFeesPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-16">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Manajemen Keuangan & SPP</h1>
-          <p className="text-sm text-slate-400 mt-1">Rekapitulasi status pembayaran iuran dan administrasi siswa per kelas.</p>
+          <p className="text-sm text-slate-400 mt-1">Rekapitulasi status pembayaran iuran, SPP bulanan, dan administrasi siswa.</p>
         </div>
+        
+        <button
+          onClick={handleSaveAll}
+          disabled={saving || students.length === 0}
+          className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 cursor-pointer transition-all disabled:opacity-50"
+        >
+          <Save className="h-4.5 w-4.5" />
+          <span>{saving ? "Menyimpan..." : "Simpan Perubahan Keuangan"}</span>
+        </button>
       </div>
 
-      {/* Filter Kelas & Pencarian */}
-      <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="w-full sm:w-72">
+      {/* Filter Bar */}
+      <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
           <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Pilih Kelas</label>
           <select 
             value={selectedClass}
             onChange={e => setSelectedClass(e.target.value)}
-            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
           >
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -174,13 +206,38 @@ export default function TuitionFeesPage() {
           </select>
         </div>
 
-        <div className="w-full sm:w-80">
+        <div>
+          <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Tahun Ajaran</label>
+          <select 
+            value={academicYear}
+            onChange={e => setAcademicYear(e.target.value)}
+            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+          >
+            <option value="2026/2027">2026/2027</option>
+            <option value="2025/2026">2025/2026</option>
+            <option value="2027/2028">2027/2028</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Semester</label>
+          <select 
+            value={semester}
+            onChange={e => setSemester(e.target.value)}
+            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+          >
+            <option value="Ganjil">Semester Ganjil</option>
+            <option value="Genap">Semester Genap</option>
+          </select>
+        </div>
+
+        <div>
           <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Cari Siswa</label>
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
             <input 
               type="text"
-              placeholder="Cari nama atau NIS siswa..."
+              placeholder="Cari nama / NIS..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-800 bg-slate-950 pl-10 pr-4 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
@@ -189,10 +246,10 @@ export default function TuitionFeesPage() {
         </div>
       </div>
 
-      {/* Tabel Keuangan Siswa */}
+      {/* Tabel Keuangan */}
       {loading ? (
         <div className="space-y-4">
-          {[1, 2, 3, 4].map(n => <div key={n} className="h-16 w-full animate-pulse rounded-xl bg-slate-900" />)}
+          {[1, 2, 3].map(n => <div key={n} className="h-20 w-full animate-pulse rounded-xl bg-slate-900" />)}
         </div>
       ) : (
         <div className="rounded-2xl border border-slate-900 bg-slate-900/40 backdrop-blur-sm overflow-hidden">
@@ -201,13 +258,11 @@ export default function TuitionFeesPage() {
               <thead className="bg-slate-900/80 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="py-4 px-6 w-16">No</th>
-                  <th className="py-4 px-6">Nama Siswa</th>
+                  <th className="py-4 px-6 min-w-[200px]">Nama Siswa</th>
                   <th className="py-4 px-6 text-center">Uang Pangkal</th>
                   <th className="py-4 px-6 text-center">Uang Pendidikan</th>
-                  <th className="py-4 px-6 text-center">SPP Bulanan</th>
-                  {isGrade12 && (
-                    <th className="py-4 px-6 text-center text-amber-400">Iuran Akhirussanah (Kelas 12)</th>
-                  )}
+                  {isGrade12 && <th className="py-4 px-6 text-center text-amber-400">Iuran Akhirussanah</th>}
+                  <th className="py-4 px-6 text-center min-w-[500px]">SPP Bulanan ({semester} {academicYear})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -219,8 +274,9 @@ export default function TuitionFeesPage() {
                   </tr>
                 ) : (
                   filteredStudents.map((student, idx) => {
-                    const fee = feesData[student.id] || { uangPangkal: false, uangPendidikan: false, spp: false, iuranAkhirussanah: false };
-                    
+                    const fee = feesData[student.id] || { uangPangkal: false, uangPendidikan: false, iuranAkhirussanah: false, sppMonths: {} };
+                    const spp = fee.sppMonths || {};
+
                     return (
                       <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
                         <td className="py-4 px-6 font-medium text-slate-500">{idx + 1}</td>
@@ -232,7 +288,8 @@ export default function TuitionFeesPage() {
                         {/* Uang Pangkal */}
                         <td className="py-4 px-6 text-center">
                           <button 
-                            onClick={() => handleToggleFee(student.id, "uangPangkal")}
+                            type="button"
+                            onClick={() => handleToggle(student.id, "uangPangkal")}
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                               fee.uangPangkal 
                                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" 
@@ -240,14 +297,15 @@ export default function TuitionFeesPage() {
                             }`}
                           >
                             {fee.uangPangkal ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-slate-500" />}
-                            <span>{fee.uangPangkal ? "Sudah Bayar" : "Belum"}</span>
+                            <span>{fee.uangPangkal ? "Lunas" : "Belum"}</span>
                           </button>
                         </td>
 
                         {/* Uang Pendidikan */}
                         <td className="py-4 px-6 text-center">
                           <button 
-                            onClick={() => handleToggleFee(student.id, "uangPendidikan")}
+                            type="button"
+                            onClick={() => handleToggle(student.id, "uangPendidikan")}
                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                               fee.uangPendidikan 
                                 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" 
@@ -255,30 +313,16 @@ export default function TuitionFeesPage() {
                             }`}
                           >
                             {fee.uangPendidikan ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-slate-500" />}
-                            <span>{fee.uangPendidikan ? "Sudah Bayar" : "Belum"}</span>
+                            <span>{fee.uangPendidikan ? "Lunas" : "Belum"}</span>
                           </button>
                         </td>
 
-                        {/* SPP */}
-                        <td className="py-4 px-6 text-center">
-                          <button 
-                            onClick={() => handleToggleFee(student.id, "spp")}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                              fee.spp 
-                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20" 
-                                : "bg-slate-800/60 text-slate-400 border-slate-700 hover:bg-slate-800"
-                            }`}
-                          >
-                            {fee.spp ? <CheckCircle2 className="h-4 w-4 text-emerald-400" /> : <XCircle className="h-4 w-4 text-slate-500" />}
-                            <span>{fee.spp ? "Sudah Bayar" : "Belum"}</span>
-                          </button>
-                        </td>
-
-                        {/* Iuran Akhirussanah (Khusus Kelas 12) */}
+                        {/* Iuran Akhirussanah Kelas 12 */}
                         {isGrade12 && (
                           <td className="py-4 px-6 text-center">
                             <button 
-                              onClick={() => handleToggleFee(student.id, "iuranAkhirussanah")}
+                              type="button"
+                              onClick={() => handleToggle(student.id, "iuranAkhirussanah")}
                               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                                 fee.iuranAkhirussanah 
                                   ? "bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20" 
@@ -286,10 +330,37 @@ export default function TuitionFeesPage() {
                               }`}
                             >
                               {fee.iuranAkhirussanah ? <CheckCircle2 className="h-4 w-4 text-amber-400" /> : <XCircle className="h-4 w-4 text-slate-500" />}
-                              <span>{fee.iuranAkhirussanah ? "Sudah Bayar" : "Belum"}</span>
+                              <span>{fee.iuranAkhirussanah ? "Lunas" : "Belum"}</span>
                             </button>
                           </td>
                         )}
+
+                        {/* SPP Bulanan (Jan - Des) */}
+                        <td className="py-4 px-6">
+                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
+                            {MONTHS.map(m => {
+                              const isPaid = !!spp[m.id];
+                              return (
+                                <button
+                                  key={m.id}
+                                  type="button"
+                                  onClick={() => handleToggle(student.id, "spp", m.id)}
+                                  className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                                    isPaid
+                                      ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25"
+                                      : "bg-slate-950/60 text-slate-500 border-slate-800 hover:border-slate-700 hover:text-slate-300"
+                                  }`}
+                                  title={`SPP ${m.label}: ${isPaid ? "Lunas" : "Belum"}`}
+                                >
+                                  <span className="uppercase">{m.label}</span>
+                                  <span className={`text-[9px] font-normal ${isPaid ? "text-emerald-300" : "text-slate-600"}`}>
+                                    {isPaid ? "✔" : "·"}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </td>
                       </tr>
                     );
                   })
