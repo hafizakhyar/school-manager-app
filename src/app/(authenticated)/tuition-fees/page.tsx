@@ -41,10 +41,16 @@ const MONTHS = [
   { id: "des", label: "Des" },
 ];
 
+const defaultMonths = {
+  jan: false, feb: false, mar: false, apr: false,
+  mei: false, jun: false, jul: false, agu: false,
+  sep: false, okt: false, nov: false, des: false
+};
+
 export default function TuitionFeesPage() {
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClass, setSelectedClass] = useState<string>("");
-  const [academicYear, setAcademicYear] = useState<string>("2026/2027");
+  const [academicYear, setAcademicYear] = useState<string>("2026-2027");
   const [semester, setSemester] = useState<string>("Ganjil");
   
   const [students, setStudents] = useState<Student[]>([]);
@@ -84,28 +90,33 @@ export default function TuitionFeesPage() {
           const data = d.data();
           studentList.push({ id: d.id, fullName: data.fullName || data.name, nis: data.nis, classId: data.classId });
         });
-        studentList.sort((a, b) => a.fullName.localeCompare(b.fullName));
+        studentList.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
         setStudents(studentList);
 
-        const safeYear = academicYear.replace("/", "-");
         const feesMap: { [studentId: string]: any } = {};
+        
         for (const student of studentList) {
-          const docKey = `${student.id}_${safeYear}_${semester}`;
+          const docKey = `${student.id}_${academicYear}_${semester}`;
           const feeDocRef = doc(db, "tuitionFees", docKey);
           const feeSnap = await getDoc(feeDocRef);
           
           if (feeSnap.exists()) {
-            feesMap[student.id] = feeSnap.data();
+            const data = feeSnap.data();
+            feesMap[student.id] = {
+              uangPangkal: !!data.uangPangkal,
+              uangPendidikan: !!data.uangPendidikan,
+              iuranAkhirussanah: !!data.iuranAkhirussanah,
+              sppMonths: {
+                ...defaultMonths,
+                ...(data.sppMonths || {})
+              }
+            };
           } else {
             feesMap[student.id] = {
               uangPangkal: false,
               uangPendidikan: false,
               iuranAkhirussanah: false,
-              sppMonths: {
-                jan: false, feb: false, mar: false, apr: false,
-                mei: false, jun: false, jul: false, agu: false,
-                sep: false, okt: false, nov: false, des: false
-              }
+              sppMonths: { ...defaultMonths }
             };
           }
         }
@@ -122,32 +133,50 @@ export default function TuitionFeesPage() {
 
   const handleToggle = (studentId: string, field: string, monthKey?: string) => {
     setFeesData(prev => {
-      const studentRecord = { ...prev[studentId] };
+      const current = prev[studentId] || {
+        uangPangkal: false,
+        uangPendidikan: false,
+        iuranAkhirussanah: false,
+        sppMonths: { ...defaultMonths }
+      };
+
+      const updated = {
+        ...current,
+        sppMonths: {
+          ...(current.sppMonths || { ...defaultMonths })
+        }
+      };
+
       if (monthKey) {
-        studentRecord.sppMonths = {
-          ...studentRecord.sppMonths,
-          [monthKey]: !studentRecord.sppMonths[monthKey]
-        };
+        updated.sppMonths[monthKey] = !updated.sppMonths[monthKey];
       } else {
-        studentRecord[field] = !studentRecord[field];
+        (updated as any)[field] = !updated[field];
       }
-      return { ...prev, [studentId]: studentRecord };
+
+      return {
+        ...prev,
+        [studentId]: updated
+      };
     });
   };
 
   const handleSaveAll = async () => {
     setSaving(true);
     try {
-      const safeYear = academicYear.replace("/", "-");
       for (const student of students) {
-        const docKey = `${student.id}_${safeYear}_${semester}`;
+        const docKey = `${student.id}_${academicYear}_${semester}`;
         const docRef = doc(db, "tuitionFees", docKey);
-        const dataToSave = feesData[student.id] || {};
+        const dataToSave = feesData[student.id] || {
+          uangPangkal: false,
+          uangPendidikan: false,
+          iuranAkhirussanah: false,
+          sppMonths: { ...defaultMonths }
+        };
 
         await setDoc(docRef, {
           studentId: student.id,
           classId: selectedClass,
-          academicYear,
+          academicYear: academicYear.replace("-", "/"),
           semester,
           ...dataToSave,
           updatedAt: Timestamp.now()
@@ -166,7 +195,7 @@ export default function TuitionFeesPage() {
   const isGrade12 = currentClassName.includes("12") || currentClassName.toUpperCase().includes("XII");
 
   const filteredStudents = students.filter(s => 
-    s.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (s.fullName || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
     (s.nis && s.nis.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -179,6 +208,7 @@ export default function TuitionFeesPage() {
         </div>
         
         <button
+          type="button"
           onClick={handleSaveAll}
           disabled={saving || students.length === 0}
           className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 cursor-pointer transition-all disabled:opacity-50"
@@ -209,9 +239,9 @@ export default function TuitionFeesPage() {
             onChange={e => setAcademicYear(e.target.value)}
             className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
           >
-            <option value="2026/2027">2026/2027</option>
-            <option value="2025/2026">2025/2026</option>
-            <option value="2027/2028">2027/2028</option>
+            <option value="2026-2027">2026/2027</option>
+            <option value="2025-2026">2025/2026</option>
+            <option value="2027-2028">2027/2028</option>
           </select>
         </div>
 
@@ -257,7 +287,7 @@ export default function TuitionFeesPage() {
                   <th className="py-4 px-6 text-center">Uang Pangkal</th>
                   <th className="py-4 px-6 text-center">Uang Pendidikan</th>
                   {isGrade12 && <th className="py-4 px-6 text-center text-amber-400">Iuran Akhirussanah</th>}
-                  <th className="py-4 px-6 text-center min-w-[500px]">SPP Bulanan ({semester} {academicYear})</th>
+                  <th className="py-4 px-6 text-center min-w-[500px]">SPP Bulanan ({semester} {academicYear.replace("-", "/")})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -269,8 +299,13 @@ export default function TuitionFeesPage() {
                   </tr>
                 ) : (
                   filteredStudents.map((student, idx) => {
-                    const fee = feesData[student.id] || { uangPangkal: false, uangPendidikan: false, iuranAkhirussanah: false, sppMonths: {} };
-                    const spp = fee.sppMonths || {};
+                    const fee = feesData[student.id] || { 
+                      uangPangkal: false, 
+                      uangPendidikan: false, 
+                      iuranAkhirussanah: false, 
+                      sppMonths: { ...defaultMonths } 
+                    };
+                    const spp = fee.sppMonths || { ...defaultMonths };
 
                     return (
                       <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
