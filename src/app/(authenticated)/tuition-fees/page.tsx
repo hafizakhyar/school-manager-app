@@ -19,6 +19,7 @@ interface Student {
   fullName: string;
   nis: string;
   classId: string;
+  tuitionData?: any;
 }
 
 interface ClassItem {
@@ -86,40 +87,45 @@ export default function TuitionFeesPage() {
         const q = query(collection(db, "students"), where("classId", "==", selectedClass));
         const studentSnap = await getDocs(q);
         const studentList: Student[] = [];
+        const feesMap: { [studentId: string]: any } = {};
+        const docKey = `${academicYear}_${semester}`;
+
         studentSnap.forEach(d => {
           const data = d.data();
-          studentList.push({ id: d.id, fullName: data.fullName || data.name, nis: data.nis, classId: data.classId });
-        });
-        studentList.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
-        setStudents(studentList);
+          const studentId = d.id;
+          studentList.push({ 
+            id: studentId, 
+            fullName: data.fullName || data.name, 
+            nis: data.nis, 
+            classId: data.classId,
+            tuitionData: data.tuitionData || {}
+          });
 
-        const feesMap: { [studentId: string]: any } = {};
-        
-        for (const student of studentList) {
-          const docKey = `${student.id}_${academicYear}_${semester}`;
-          const feeDocRef = doc(db, "tuitionFees", docKey);
-          const feeSnap = await getDoc(feeDocRef);
-          
-          if (feeSnap.exists()) {
-            const data = feeSnap.data();
-            feesMap[student.id] = {
-              uangPangkal: !!data.uangPangkal,
-              uangPendidikan: !!data.uangPendidikan,
-              iuranAkhirussanah: !!data.iuranAkhirussanah,
+          const allTuition = data.tuitionData || {};
+          const currentRecord = allTuition[docKey];
+
+          if (currentRecord) {
+            feesMap[studentId] = {
+              uangPangkal: !!currentRecord.uangPangkal,
+              uangPendidikan: !!currentRecord.uangPendidikan,
+              iuranAkhirussanah: !!currentRecord.iuranAkhirussanah,
               sppMonths: {
                 ...defaultMonths,
-                ...(data.sppMonths || {})
+                ...(currentRecord.sppMonths || {})
               }
             };
           } else {
-            feesMap[student.id] = {
+            feesMap[studentId] = {
               uangPangkal: false,
               uangPendidikan: false,
               iuranAkhirussanah: false,
               sppMonths: { ...defaultMonths }
             };
           }
-        }
+        });
+
+        studentList.sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""));
+        setStudents(studentList);
         setFeesData(feesMap);
       } catch (err) {
         console.error("Gagal memuat data:", err);
@@ -163,9 +169,10 @@ export default function TuitionFeesPage() {
   const handleSaveAll = async () => {
     setSaving(true);
     try {
+      const docKey = `${academicYear}_${semester}`;
+      
       for (const student of students) {
-        const docKey = `${student.id}_${academicYear}_${semester}`;
-        const docRef = doc(db, "tuitionFees", docKey);
+        const studentRef = doc(db, "students", student.id);
         const dataToSave = feesData[student.id] || {
           uangPangkal: false,
           uangPendidikan: false,
@@ -173,19 +180,23 @@ export default function TuitionFeesPage() {
           sppMonths: { ...defaultMonths }
         };
 
-        await setDoc(docRef, {
-          studentId: student.id,
-          classId: selectedClass,
-          academicYear: academicYear.replace("-", "/"),
-          semester,
-          ...dataToSave,
-          updatedAt: Timestamp.now()
+        const existingTuition = student.tuitionData || {};
+
+        await setDoc(studentRef, {
+          tuitionData: {
+            ...existingTuition,
+            [docKey]: {
+              ...dataToSave,
+              updatedAt: Timestamp.now()
+            }
+          }
         }, { merge: true });
       }
+
       alert("Semua data keuangan & SPP berhasil disimpan!");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gagal menyimpan:", err);
-      alert("Terjadi kesalahan saat menyimpan data ke database.");
+      alert("Terjadi kesalahan saat menyimpan data: " + (err.message || "Unknown error"));
     } finally {
       setSaving(false);
     }
