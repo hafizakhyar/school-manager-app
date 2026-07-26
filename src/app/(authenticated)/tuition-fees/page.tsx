@@ -8,7 +8,6 @@ import {
   doc, 
   setDoc, 
   query, 
-  where, 
   Timestamp 
 } from "firebase/firestore";
 import { Wallet, CheckCircle2, XCircle, Search, Save } from "lucide-react";
@@ -27,21 +26,6 @@ interface ClassItem {
   name: string;
 }
 
-const MONTHS = [
-  { id: "jan", label: "Jan" },
-  { id: "feb", label: "Feb" },
-  { id: "mar", label: "Mar" },
-  { id: "apr", label: "Apr" },
-  { id: "mei", label: "Mei" },
-  { id: "jun", label: "Jun" },
-  { id: "jul", label: "Jul" },
-  { id: "agu", label: "Ags" },
-  { id: "sep", label: "Sep" },
-  { id: "okt", label: "Okt" },
-  { id: "nov", label: "Nov" },
-  { id: "des", label: "Des" },
-];
-
 const defaultMonths = {
   jan: false, feb: false, mar: false, apr: false,
   mei: false, jun: false, jul: false, agu: false,
@@ -59,6 +43,23 @@ export default function TuitionFeesPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Daftar bulan dinamis berdasarkan semester
+  const activeMonths = semester === "Ganjil" ? [
+    { id: "jul", label: "Jul" },
+    { id: "agu", label: "Ags" },
+    { id: "sep", label: "Sep" },
+    { id: "okt", label: "Okt" },
+    { id: "nov", label: "Nov" },
+    { id: "des", label: "Des" },
+  ] : [
+    { id: "jan", label: "Jan" },
+    { id: "feb", label: "Feb" },
+    { id: "mar", label: "Mar" },
+    { id: "apr", label: "Apr" },
+    { id: "mei", label: "Mei" },
+    { id: "jun", label: "Jun" },
+  ];
 
   // Ambil daftar kelas
   useEffect(() => {
@@ -82,7 +83,7 @@ export default function TuitionFeesPage() {
     fetchClasses();
   }, []);
 
-  // Ambil data siswa berdasarkan kelas terpilih (fleksibel: cek ID atau Nama Kelas)
+  // Ambil data siswa berdasarkan kelas terpilih
   useEffect(() => {
     if (!selectedClass) return;
 
@@ -92,7 +93,6 @@ export default function TuitionFeesPage() {
         const selectedClassObj = classes.find(c => c.id === selectedClass);
         const className = selectedClassObj ? selectedClassObj.name : "";
 
-        // Ambil semua siswa agar aman dari perbedaan format classId vs className di database
         const studentSnap = await getDocs(collection(db, "students"));
         const studentList: Student[] = [];
         const feesMap: { [studentId: string]: any } = {};
@@ -104,7 +104,6 @@ export default function TuitionFeesPage() {
           const sClassId = data.classId || "";
           const sClassName = data.className || "";
 
-          // Filter manual agar mencakup semua kemungkinan format penyimpanan kelas
           const isMatch = 
             sClassId === selectedClass || 
             sClassId === className || 
@@ -318,7 +317,7 @@ export default function TuitionFeesPage() {
                   <th className="py-4 px-6 text-center">Uang Pangkal</th>
                   <th className="py-4 px-6 text-center">Uang Pendidikan</th>
                   {isGrade12 && <th className="py-4 px-6 text-center text-amber-400">Iuran Akhirussanah</th>}
-                  <th className="py-4 px-6 text-center min-w-[500px]">SPP Bulanan ({semester} {academicYear.replace("-", "/")})</th>
+                  <th className="py-4 px-6 text-center min-w-[380px]">SPP Bulanan ({semester} {academicYear.replace("-", "/")})</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
@@ -394,8 +393,8 @@ export default function TuitionFeesPage() {
                         )}
 
                         <td className="py-4 px-6">
-                          <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
-                            {MONTHS.map(m => {
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {activeMonths.map(m => {
                               const isPaid = !!spp[m.id];
                               return (
                                 <button
