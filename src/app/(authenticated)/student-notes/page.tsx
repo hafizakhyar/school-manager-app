@@ -9,7 +9,14 @@ import {
   setDoc, 
   Timestamp 
 } from "firebase/firestore";
-import { ClipboardPen, Search, Save, Upload, CheckSquare, Square } from "lucide-react";
+import { ClipboardPen, Search, Save, Upload, CheckSquare, Square, Plus, Trash2, X, FileText } from "lucide-react";
+
+interface NoteItem {
+  id: string;
+  type: string;
+  date: string;
+  note: string;
+}
 
 interface Student {
   id: string;
@@ -32,11 +39,18 @@ export default function StudentNotesPage() {
   const [semester, setSemester] = useState<string>("Ganjil");
   
   const [students, setStudents] = useState<Student[]>([]);
-  const [notesRecords, setNotesRecords] = useState<{ [studentId: string]: any }>({});
+  const [notesRecords, setNotesRecords] = useState<{ [studentId: string]: NoteItem[] }>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectAll, setSelectAll] = useState(false);
+
+  // State untuk Modal Kelola Catatan Multi
+  const [activeStudent, setActiveStudent] = useState<Student | null>(null);
+  const [modalNotes, setModalNotes] = useState<NoteItem[]>([]);
+  const [newType, setNewType] = useState("Catatan Harian");
+  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newText, setNewText] = useState("");
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -69,7 +83,7 @@ export default function StudentNotesPage() {
 
         const studentSnap = await getDocs(collection(db, "students"));
         const studentList: Student[] = [];
-        const recordsMap: { [studentId: string]: any } = {};
+        const recordsMap: { [studentId: string]: NoteItem[] } = {};
         const docKey = `${academicYear.replace("/", "-")}_${semester}`;
 
         studentSnap.forEach(d => {
@@ -96,20 +110,18 @@ export default function StudentNotesPage() {
             const allNotes = data.studentNotesData || {};
             const currentRecord = allNotes[docKey];
 
-            if (currentRecord) {
-              recordsMap[studentId] = {
-                selected: false,
+            // Konversi format lama (object tunggal) atau gunakan array multi-catatan
+            if (Array.isArray(currentRecord)) {
+              recordsMap[studentId] = currentRecord;
+            } else if (currentRecord && typeof currentRecord === 'object') {
+              recordsMap[studentId] = [{
+                id: Date.now().toString(),
                 type: currentRecord.type || "Catatan Harian",
                 date: currentRecord.date || todayStr,
                 note: currentRecord.note || ""
-              };
+              }];
             } else {
-              recordsMap[studentId] = {
-                selected: false,
-                type: "Catatan Harian",
-                date: todayStr,
-                note: ""
-              };
+              recordsMap[studentId] = [];
             }
           }
         });
@@ -129,27 +141,51 @@ export default function StudentNotesPage() {
   }, [selectedClass, academicYear, semester, classes]);
 
   const handleToggleSelectAll = () => {
-    const newSelectState = !selectAll;
-    setSelectAll(newSelectState);
-    setNotesRecords(prev => {
-      const updated = { ...prev };
-      Object.keys(updated).forEach(id => {
-        updated[id] = { ...updated[id], selected: newSelectState };
-      });
-      return updated;
-    });
+    // Bisa digunakan untuk memilih baris jika diperlukan
+    setSelectAll(!selectAll);
   };
 
-  const handleChangeField = (studentId: string, field: string, value: any) => {
+  // Buka Modal Kelola Catatan
+  const handleOpenModal = (student: Student) => {
+    setActiveStudent(student);
+    setModalNotes(notesRecords[student.id] || []);
+    setNewType("Catatan Harian");
+    setNewDate(todayStr);
+    setNewText("");
+  };
+
+  // Tambah catatan ke dalam modal sementara
+  const handleAddNoteToModal = () => {
+    if (!newText.trim()) {
+      alert("Isi catatan / keterangan wajib diisi!");
+      return;
+    }
+    const newItem: NoteItem = {
+      id: Date.now().toString(),
+      type: newType,
+      date: newDate,
+      note: newText.trim()
+    };
+    setModalNotes([...modalNotes, newItem]);
+    setNewText("");
+  };
+
+  // Hapus catatan dari modal sementara
+  const handleDeleteNoteFromModal = (noteId: string) => {
+    setModalNotes(modalNotes.filter(item => item.id !== noteId));
+  };
+
+  // Simpan perubahan dari modal ke state utama
+  const handleSaveModalChanges = () => {
+    if (!activeStudent) return;
     setNotesRecords(prev => ({
       ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        [field]: value
-      }
+      [activeStudent.id]: modalNotes
     }));
+    setActiveStudent(null);
   };
 
+  // Simpan seluruh data ke Firestore
   const handleSaveAll = async () => {
     setSaving(true);
     try {
@@ -157,23 +193,18 @@ export default function StudentNotesPage() {
       
       for (const student of students) {
         const studentRef = doc(db, "students", student.id);
-        const dataToSave = notesRecords[student.id] || {};
+        const studentNotesArray = notesRecords[student.id] || [];
         const existingNotes = student.studentNotesData || {};
 
         await setDoc(studentRef, {
           studentNotesData: {
             ...existingNotes,
-            [docKey]: {
-              type: dataToSave.type || "Catatan Harian",
-              date: dataToSave.date || todayStr,
-              note: dataToSave.note || "",
-              updatedAt: Timestamp.now()
-            }
+            [docKey]: studentNotesArray
           }
         }, { merge: true });
       }
 
-      alert("Catatan Siswa berhasil disimpan!");
+      alert("Semua Catatan Siswa berhasil disimpan!");
     } catch (err: any) {
       console.error("Gagal menyimpan:", err);
       alert("Terjadi kesalahan saat menyimpan data.");
@@ -198,7 +229,7 @@ export default function StudentNotesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Catatan & Jurnal Siswa</h1>
-          <p className="text-sm text-slate-400 mt-1">Rekap prestasi, pelanggaran, dan catatan harian perilaku siswa.</p>
+          <p className="text-sm text-slate-400 mt-1">Rekap prestasi, pelanggaran, dan catatan harian perilaku siswa (Multi-Catatan).</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -215,11 +246,12 @@ export default function StudentNotesPage() {
             className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/25 cursor-pointer transition-all disabled:opacity-50"
           >
             <Save className="h-4.5 w-4.5" />
-            <span>{saving ? "Menyimpan..." : "Simpan Catatan"}</span>
+            <span>{saving ? "Menyimpan..." : "Simpan Semua Catatan"}</span>
           </button>
         </div>
       </div>
 
+      {/* Filter Bar */}
       <div className="rounded-2xl border border-slate-900 bg-slate-900/40 p-5 backdrop-blur-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div>
           <label className="block text-xs font-bold uppercase text-slate-500 mb-1.5">Pilih Kelas</label>
@@ -274,6 +306,7 @@ export default function StudentNotesPage() {
         </div>
       </div>
 
+      {/* Tabel Catatan Siswa */}
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3, 4].map(n => <div key={n} className="h-16 w-full animate-pulse rounded-xl bg-slate-900" />)}
@@ -285,76 +318,71 @@ export default function StudentNotesPage() {
               <thead className="bg-slate-900/80 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="py-4 px-4 w-12 text-center">
-                    <button type="button" onClick={handleToggleSelectAll} className="text-slate-400 hover:text-white cursor-pointer" title="Pilih Semua / Batal">
-                      {selectAll ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
-                    </button>
+                    <span className="text-slate-500">#</span>
                   </th>
                   <th className="py-4 px-4 w-16">No</th>
                   <th className="py-4 px-6 min-w-[140px]">NIS</th>
-                  <th className="py-4 px-6 min-w-[200px]">Nama Siswa</th>
-                  <th className="py-4 px-6 min-w-[160px]">Jenis Catatan</th>
-                  <th className="py-4 px-6 min-w-[160px]">Tanggal Kejadian</th>
-                  <th className="py-4 px-6 min-w-[320px]">Isi Catatan / Keterangan</th>
+                  <th className="py-4 px-6 min-w-[240px]">Nama Siswa</th>
+                  <th className="py-4 px-6 min-w-[200px]">Ringkasan Catatan</th>
+                  <th className="py-4 px-6 min-w-[180px] text-center">Aksi / Kelola</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-900">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500 text-sm">
+                    <td colSpan={6} className="py-12 text-center text-slate-500 text-sm">
                       Tidak ada data siswa ditemukan di kelas ini.
                     </td>
                   </tr>
                 ) : (
                   filteredStudents.map((student, idx) => {
-                    const record = notesRecords[student.id] || { selected: false, type: "Catatan Harian", date: todayStr, note: "" };
+                    const studentNotes = notesRecords[student.id] || [];
+                    const prestasiCount = studentNotes.filter(n => n.type === "Prestasi").length;
+                    const pelanggaranCount = studentNotes.filter(n => n.type === "Pelanggaran").length;
+                    const harianCount = studentNotes.filter(n => n.type === "Catatan Harian").length;
 
                     return (
                       <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
-                        <td className="py-4 px-4 text-center">
-                          <button 
-                            type="button" 
-                            onClick={() => handleChangeField(student.id, "selected", !record.selected)}
-                            className="text-slate-500 hover:text-indigo-400 cursor-pointer"
-                          >
-                            {record.selected ? <CheckSquare className="h-4.5 w-4.5 text-indigo-400" /> : <Square className="h-4.5 w-4.5" />}
-                          </button>
-                        </td>
+                        <td className="py-4 px-4 text-center text-slate-600">•</td>
                         <td className="py-4 px-4 font-medium text-slate-500">{idx + 1}</td>
                         <td className="py-4 px-6 text-xs text-slate-300 font-mono font-semibold">{student.nis}</td>
                         <td className="py-4 px-6 font-semibold text-white">{student.fullName}</td>
 
+                        {/* Ringkasan Catatan */}
                         <td className="py-4 px-6">
-                          <select 
-                            value={record.type}
-                            onChange={e => handleChangeField(student.id, "type", e.target.value)}
-                            className={`w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-semibold outline-none focus:border-indigo-500 ${
-                              record.type === "Prestasi" ? "text-emerald-400" :
-                              record.type === "Pelanggaran" ? "text-red-400" : "text-indigo-400"
-                            }`}
+                          {studentNotes.length === 0 ? (
+                            <span className="text-xs text-slate-500 italic">Belum ada catatan</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {prestasiCount > 0 && (
+                                <span className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
+                                  {prestasiCount} Prestasi
+                                </span>
+                              )}
+                              {pelanggaranCount > 0 && (
+                                <span className="rounded-md bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-[11px] font-semibold text-red-400">
+                                  {pelanggaranCount} Pelanggaran
+                                </span>
+                              )}
+                              {harianCount > 0 && (
+                                <span className="rounded-md bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[11px] font-semibold text-indigo-400">
+                                  {harianCount} Harian
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Tombol Kelola Catatan */}
+                        <td className="py-4 px-6 text-center">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenModal(student)}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600/15 border border-indigo-500/30 px-3.5 py-2 text-xs font-semibold text-indigo-400 hover:bg-indigo-600/25 transition-all cursor-pointer shadow-sm"
                           >
-                            <option value="Catatan Harian">Catatan Harian</option>
-                            <option value="Prestasi">Prestasi</option>
-                            <option value="Pelanggaran">Pelanggaran</option>
-                          </select>
-                        </td>
-
-                        <td className="py-4 px-6">
-                          <input 
-                            type="date"
-                            value={record.date}
-                            onChange={e => handleChangeField(student.id, "date", e.target.value)}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-medium"
-                          />
-                        </td>
-
-                        <td className="py-4 px-6">
-                          <input 
-                            type="text"
-                            placeholder="Tuliskan catatan, prestasi, atau pelanggaran..."
-                            value={record.note}
-                            onChange={e => handleChangeField(student.id, "note", e.target.value)}
-                            className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500"
-                          />
+                            <ClipboardPen className="h-3.5 w-3.5" />
+                            <span>Kelola ({studentNotes.length})</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -362,6 +390,134 @@ export default function StudentNotesPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KELOLA MULTI-CATATAN SISWA */}
+      {activeStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setActiveStudent(null)} />
+          <div className="relative w-full max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div>
+                <h2 className="text-lg font-bold text-white">Kelola Riwayat Catatan Siswa</h2>
+                <p className="text-xs text-indigo-400 font-semibold mt-0.5">
+                  {activeStudent.fullName} <span className="text-slate-500 font-mono font-normal">({activeStudent.nis})</span>
+                </p>
+              </div>
+              <button onClick={() => setActiveStudent(null)} className="text-slate-400 hover:text-white cursor-pointer p-1">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Form Tambah Catatan Baru dalam Modal */}
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 space-y-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Tambah Catatan / Prestasi Baru</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Jenis Catatan</label>
+                  <select
+                    value={newType}
+                    onChange={e => setNewType(e.target.value)}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-semibold"
+                  >
+                    <option value="Catatan Harian">Catatan Harian</option>
+                    <option value="Prestasi">Prestasi</option>
+                    <option value="Pelanggaran">Pelanggaran</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Tanggal Kejadian</label>
+                  <input
+                    type="date"
+                    value={newDate}
+                    onChange={e => setNewDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">Isi Keterangan / Uraian</label>
+                <input
+                  type="text"
+                  placeholder="Tuliskan keterangan lengkap..."
+                  value={newText}
+                  onChange={e => setNewText(e.target.value)}
+                  className="w-full rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleAddNoteToModal}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-md cursor-pointer transition-all"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Tambah ke Daftar</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Daftar Catatan yang Sudah Ada */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Daftar Riwayat ({modalNotes.length})</p>
+              
+              {modalNotes.length === 0 ? (
+                <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-6 text-center text-slate-500 text-xs">
+                  Belum ada catatan tercatat untuk semester ini.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {modalNotes.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                            item.type === "Prestasi" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
+                            item.type === "Pelanggaran" ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                            "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                          }`}>
+                            {item.type}
+                          </span>
+                          <span className="text-slate-500 font-mono text-[11px]">{item.date}</span>
+                        </div>
+                        <p className="text-slate-200 font-medium truncate">{item.note}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteNoteFromModal(item.id)}
+                        className="text-slate-500 hover:text-red-400 p-2 rounded-lg hover:bg-slate-900 transition-colors cursor-pointer"
+                        title="Hapus catatan ini"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tombol Simpan Modal */}
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <button 
+                type="button" 
+                onClick={() => setActiveStudent(null)} 
+                className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white cursor-pointer"
+              >
+                Batal
+              </button>
+              <button 
+                type="button" 
+                onClick={handleSaveModalChanges} 
+                className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white hover:bg-indigo-700 shadow-md cursor-pointer transition-all"
+              >
+                Selesai & Perbarui Baris
+              </button>
+            </div>
           </div>
         </div>
       )}
