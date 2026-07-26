@@ -7,7 +7,6 @@ import {
   getDocs, 
   doc, 
   setDoc, 
-  getDoc, 
   query, 
   where, 
   Timestamp 
@@ -19,6 +18,7 @@ interface Student {
   fullName: string;
   nis: string;
   classId: string;
+  className?: string;
   tuitionData?: any;
 }
 
@@ -60,6 +60,7 @@ export default function TuitionFeesPage() {
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Ambil daftar kelas
   useEffect(() => {
     const fetchClasses = async () => {
       try {
@@ -67,7 +68,10 @@ export default function TuitionFeesPage() {
         const list: ClassItem[] = [];
         snap.forEach(d => {
           const data = d.data();
-          list.push({ id: d.id, name: data.name || data.className || "Kelas" });
+          list.push({ 
+            id: d.id, 
+            name: data.name || data.className || d.id 
+          });
         });
         setClasses(list);
         if (list.length > 0) setSelectedClass(list[0].id);
@@ -78,14 +82,18 @@ export default function TuitionFeesPage() {
     fetchClasses();
   }, []);
 
+  // Ambil data siswa berdasarkan kelas terpilih (fleksibel: cek ID atau Nama Kelas)
   useEffect(() => {
     if (!selectedClass) return;
 
     const fetchStudentsAndFees = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, "students"), where("classId", "==", selectedClass));
-        const studentSnap = await getDocs(q);
+        const selectedClassObj = classes.find(c => c.id === selectedClass);
+        const className = selectedClassObj ? selectedClassObj.name : "";
+
+        // Ambil semua siswa agar aman dari perbedaan format classId vs className di database
+        const studentSnap = await getDocs(collection(db, "students"));
         const studentList: Student[] = [];
         const feesMap: { [studentId: string]: any } = {};
         const docKey = `${academicYear}_${semester}`;
@@ -93,34 +101,46 @@ export default function TuitionFeesPage() {
         studentSnap.forEach(d => {
           const data = d.data();
           const studentId = d.id;
-          studentList.push({ 
-            id: studentId, 
-            fullName: data.fullName || data.name, 
-            nis: data.nis, 
-            classId: data.classId,
-            tuitionData: data.tuitionData || {}
-          });
+          const sClassId = data.classId || "";
+          const sClassName = data.className || "";
 
-          const allTuition = data.tuitionData || {};
-          const currentRecord = allTuition[docKey];
+          // Filter manual agar mencakup semua kemungkinan format penyimpanan kelas
+          const isMatch = 
+            sClassId === selectedClass || 
+            sClassId === className || 
+            sClassName === selectedClass || 
+            sClassName === className;
 
-          if (currentRecord) {
-            feesMap[studentId] = {
-              uangPangkal: !!currentRecord.uangPangkal,
-              uangPendidikan: !!currentRecord.uangPendidikan,
-              iuranAkhirussanah: !!currentRecord.iuranAkhirussanah,
-              sppMonths: {
-                ...defaultMonths,
-                ...(currentRecord.sppMonths || {})
-              }
-            };
-          } else {
-            feesMap[studentId] = {
-              uangPangkal: false,
-              uangPendidikan: false,
-              iuranAkhirussanah: false,
-              sppMonths: { ...defaultMonths }
-            };
+          if (isMatch) {
+            studentList.push({ 
+              id: studentId, 
+              fullName: data.fullName || data.name || "Tanpa Nama", 
+              nis: data.nis || "", 
+              classId: sClassId,
+              tuitionData: data.tuitionData || {}
+            });
+
+            const allTuition = data.tuitionData || {};
+            const currentRecord = allTuition[docKey];
+
+            if (currentRecord) {
+              feesMap[studentId] = {
+                uangPangkal: !!currentRecord.uangPangkal,
+                uangPendidikan: !!currentRecord.uangPendidikan,
+                iuranAkhirussanah: !!currentRecord.iuranAkhirussanah,
+                sppMonths: {
+                  ...defaultMonths,
+                  ...(currentRecord.sppMonths || {})
+                }
+              };
+            } else {
+              feesMap[studentId] = {
+                uangPangkal: false,
+                uangPendidikan: false,
+                iuranAkhirussanah: false,
+                sppMonths: { ...defaultMonths }
+              };
+            }
           }
         });
 
@@ -128,14 +148,14 @@ export default function TuitionFeesPage() {
         setStudents(studentList);
         setFeesData(feesMap);
       } catch (err) {
-        console.error("Gagal memuat data:", err);
+        console.error("Gagal memuat data siswa:", err);
       } finally {
         setLoading(false);
       }
     };
 
     fetchStudentsAndFees();
-  }, [selectedClass, academicYear, semester]);
+  }, [selectedClass, academicYear, semester, classes]);
 
   const handleToggle = (studentId: string, field: string, monthKey?: string) => {
     setFeesData(prev => {
