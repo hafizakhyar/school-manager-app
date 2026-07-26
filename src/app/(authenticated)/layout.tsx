@@ -12,6 +12,7 @@ import {
   Award, 
   FileText,
   Megaphone,
+  Wallet,
   Users, 
   UserSquare2, 
   School, 
@@ -65,6 +66,7 @@ export default function AuthenticatedLayout({
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
+    { href: "/tuition-fees", label: "Keuangan & SPP", icon: Wallet },
   ];
 
   const adminLinks = [
