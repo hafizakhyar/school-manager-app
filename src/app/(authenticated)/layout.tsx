@@ -67,9 +67,6 @@ export default function AuthenticatedLayout({
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
     { href: "/tuition-fees", label: "Keuangan & SPP", icon: Wallet },
-    { href: "/counseling", label: "Bimbingan Konseling", icon: HeartHandshake },
-    { href: "/student-notes", label: "Catatan Siswa", icon: ClipboardPen },
-    { href: "/tahfiz", label: "Capaian Tahfiz", icon: BookOpenCheck },
   ];
 
   const adminLinks = [
