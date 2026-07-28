@@ -385,7 +385,7 @@ export default function AbsensiPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Hadir / Absensi</h1>
+        <h1 className="text-3xl font-extrabold text-white tracking-tight">Daftar Hadir Pelajaran</h1>
         <p className="text-sm text-slate-400 mt-1">
           Kelola kehadiran siswa di kelas Anda.
         </p>

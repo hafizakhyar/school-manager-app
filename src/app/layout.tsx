@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SMA Islam Alam & Sains Al-Jannah — Sistem Informasi Akademik",
-  description: "Sistem Manajemen Sekolah: Jurnal Mengajar, Daftar Hadir (Absensi), dan Daftar Nilai untuk Tahun Ajaran 2026/2027",
+  description: "Sistem Manajemen Sekolah: Jurnal Mengajar, Daftar Hadir Pelajaran, dan Daftar Nilai untuk Tahun Ajaran 2026/2027",
   icons: {
     icon: "/favicon.png",
   },
@@ -20,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id">
-      <body className={`${inter.className} min-h-screen bg-slate-950 text-slate-100 antialiased`}>
+    <html lang="id" suppressHydrationWarning>
+      <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
         <Providers>
           <RouteGuard>{children}</RouteGuard>
         </Providers>
