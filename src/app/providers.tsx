@@ -35,6 +35,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const nextTheme = theme === "system" ? getSystemTheme() : theme;
     setResolvedTheme(nextTheme);
     root.classList.toggle("dark", nextTheme === "dark");
+    root.classList.toggle("light", nextTheme === "light");
     root.style.colorScheme = nextTheme;
     window.localStorage.setItem("school-theme", theme);
   }, [theme]);
