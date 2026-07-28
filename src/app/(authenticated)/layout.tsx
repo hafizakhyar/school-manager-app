@@ -40,6 +40,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/jurnal-mengajar", label: "Jurnal Mengajar", icon: BookOpen },
     { href: "/absensi", label: "Daftar Hadir Pelajaran", icon: CalendarCheck },
+    { href: "/jadwal-pelajaran", label: "Jadwal Pelajaran", icon: CalendarCheck },
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
@@ -68,7 +69,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
 
   const getRoleLabel = () => {
     if (role === "admin") return "Administrator";
-    if (role === "teacher") return "Guru Pengajar";
+    if (role === "guru" || role === "wali_kelas") return "Guru Pengajar";
+    if (role === "kepala_sekolah") return "Kepala Sekolah";
     return "Pengguna";
   };
 

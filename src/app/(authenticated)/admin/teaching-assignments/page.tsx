@@ -18,7 +18,12 @@ interface Assignment {
   teacherId: string;
   classId: string;
   subjectId: string;
+  day?: string;
+  jamKe?: number[];
 }
+
+const dayOptions = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"];
+const periodOptions = Array.from({ length: 15 }, (_, i) => i + 1);
 
 export default function AdminAssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -40,6 +45,8 @@ export default function AdminAssignmentsPage() {
   const [teacherId, setTeacherId] = useState("");
   const [classId, setClassId] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [day, setDay] = useState("Senin");
+  const [jamKe, setJamKe] = useState<number[]>([]);
 
   // CSV Import States
   const [csvSuccessMessage, setCsvSuccessMessage] = useState<string | null>(null);
@@ -69,7 +76,17 @@ export default function AdminAssignmentsPage() {
       // Assignments
       const aSnap = await getDocs(collection(db, "teachingAssignments"));
       const aList: Assignment[] = [];
-      aSnap.forEach(d => aList.push({ id: d.id, ...d.data() } as Assignment));
+      aSnap.forEach(d => {
+        const data = d.data();
+        aList.push({
+          id: d.id,
+          teacherId: data.teacherId,
+          classId: data.classId,
+          subjectId: data.subjectId,
+          day: data.day || "",
+          jamKe: data.jamKe || [],
+        });
+      });
       setAssignments(aList);
       setSelectedIds([]); // Reset selection on fetch
     } catch (err) {
@@ -132,6 +149,8 @@ export default function AdminAssignmentsPage() {
     setTeacherId(Object.keys(teachers)[0] || "");
     setClassId(Object.keys(classes)[0] || "");
     setSubjectId(Object.keys(subjects)[0] || "");
+    setDay("Senin");
+    setJamKe([]);
     setIsOpen(true);
   };
 
@@ -141,6 +160,8 @@ export default function AdminAssignmentsPage() {
     setTeacherId(a.teacherId);
     setClassId(a.classId);
     setSubjectId(a.subjectId);
+    setDay(a.day || "Senin");
+    setJamKe(a.jamKe || []);
     setIsOpen(true);
   };
 
@@ -159,6 +180,8 @@ export default function AdminAssignmentsPage() {
         teacherId,
         classId,
         subjectId,
+        day,
+        jamKe,
         createdAt: Timestamp.now()
       }, { merge: true });
 
@@ -207,6 +230,8 @@ export default function AdminAssignmentsPage() {
         const tId = cols[0];
         const cId = cols[1];
         const sId = cols[2];
+        const dayValue = cols[3] || "Senin";
+        const jamKeValue = cols[4] ? cols[4].split(";").map(num => Number(num.trim())).filter(Boolean) : [];
 
         if (!tId || !cId || !sId) {
           skipped++;
@@ -220,6 +245,8 @@ export default function AdminAssignmentsPage() {
           teacherId: tId,
           classId: cId,
           subjectId: sId,
+          day: dayValue,
+          jamKe: jamKeValue,
           createdAt: Timestamp.now()
         }, { merge: true });
         count++;
@@ -320,16 +347,18 @@ export default function AdminAssignmentsPage() {
                     className="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                   />
                 </th>
+                <th className="py-4 px-4">Hari</th>
                 <th className="py-4 px-4">Nama Guru</th>
                 <th className="py-4 px-4">Mata Pelajaran</th>
                 <th className="py-4 px-4">Kelas</th>
+                <th className="py-4 px-4">Jam Ke</th>
                 <th className="py-4 px-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-900">
               {sortedAssignments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-500 text-xs">Belum ada data penugasan mengajar.</td>
+                  <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">Belum ada data penugasan mengajar.</td>
                 </tr>
               ) : (
                 sortedAssignments.map((a) => (
@@ -342,9 +371,11 @@ export default function AdminAssignmentsPage() {
                         className="rounded border-slate-800 bg-slate-950 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                       />
                     </td>
+                    <td className="py-3.5 px-4 text-sm text-slate-200">{a.day || "-"}</td>
                     <td className="py-3.5 px-4 font-semibold text-white">{teachers[a.teacherId] || a.teacherId}</td>
                     <td className="py-3.5 px-4 text-xs text-indigo-400">{subjects[a.subjectId] || a.subjectId}</td>
                     <td className="py-3.5 px-4 text-xs text-slate-300">{classes[a.classId] || a.classId}</td>
+                    <td className="py-3.5 px-4 text-xs text-slate-400">{a.jamKe?.length ? a.jamKe.join(", ") : "-"}</td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button onClick={() => handleOpenEdit(a)} className="rounded-lg p-1.5 text-slate-400 hover:text-white cursor-pointer">
@@ -389,6 +420,42 @@ export default function AdminAssignmentsPage() {
                 <select value={classId} onChange={e => setClassId(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none cursor-pointer">
                   {Object.entries(classes).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Hari</label>
+                <select value={day} onChange={e => setDay(e.target.value)} className="w-full rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200 outline-none cursor-pointer">
+                  {dayOptions.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-400 mb-1">Jam Pelajaran</label>
+                <div className="flex flex-wrap gap-2">
+                  {periodOptions.map((periodNum) => {
+                    const active = jamKe.includes(periodNum);
+                    return (
+                      <button
+                        key={periodNum}
+                        type="button"
+                        onClick={() => {
+                          setJamKe((prev) =>
+                            prev.includes(periodNum)
+                              ? prev.filter((n) => n !== periodNum)
+                              : [...prev, periodNum].sort((a, b) => a - b)
+                          );
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                          active
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        {periodNum}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex justify-end gap-3 pt-4">
                 <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 text-sm text-slate-400 cursor-pointer">Batal</button>
