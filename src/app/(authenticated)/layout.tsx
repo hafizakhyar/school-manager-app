@@ -10,6 +10,7 @@ import {
   LayoutDashboard, 
   BookOpen, 
   CalendarCheck, 
+  CalendarDays,
   Award, 
   FileText,
   Megaphone,
@@ -42,9 +43,9 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     { href: "/jurnal-mengajar", label: "Jurnal Mengajar", icon: BookOpen },
     { href: "/absensi", label: "Daftar Hadir Pelajaran", icon: CalendarCheck },
     { href: "/jadwal-pelajaran", label: "Jadwal Pelajaran", icon: CalendarCheck },
+    { href: "/kegiatan", label: "Daftar Kegiatan", icon: CalendarDays },
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
-    // 👉 MENU ALUMNI DITAMBAHKAN DI SINI
     { href: "/alumni", label: "Alumni & Statistik", icon: BarChart3 },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
     { href: "/tuition-fees", label: "Keuangan & SPP", icon: Wallet },
@@ -113,8 +114,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
       <aside className={`hidden w-72 shrink-0 border-r ${sidebarPanelClass} backdrop-blur-md lg:block`}>
         <div className={`flex h-16 items-center gap-3 border-b ${sidebarPanelClass} px-6`}>
           <div className="flex h-9 w-9 items-center justify-center overflow-hidden">
-        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS3Ma2Rk1NtmmjnqB3BtpTTjq4TGVOHIfx0EH40NGKHeUlaPITOh21cF-24&s=10" alt="logo sekolah" className="h-full w-full object-contain" />
-      </div>
+            <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS3Ma2Rk1NtmmjnqB3BtpTTjq4TGVOHIfx0EH40NGKHeUlaPITOh21cF-24&s=10" alt="logo sekolah" className="h-full w-full object-contain" />
+          </div>
           <div>
             <span className="block text-sm font-extrabold tracking-wide text-slate-900 dark:text-white">AL-JANNAH</span>
             <span className="block text-[10px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">School Manager</span>
@@ -247,7 +248,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
               <div className={`border-t ${sidebarPanelClass} pt-4 mt-auto`}>
                 <div className={`mb-4 rounded-lg border ${sidebarPanelStrongClass} p-3`}>
                   <p className="truncate text-xs font-extrabold text-slate-900 dark:text-white">{userData?.displayName || user?.email}</p>
-                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider border ${getRoleBadgeClient()} mt-1`}>
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider border ${getRoleBadgeColor()} mt-1`}>
                     {getRoleLabel()}
                   </span>
                 </div>
