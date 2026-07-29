@@ -26,7 +26,8 @@ import {
   Menu, 
   X, 
   LogOut,
-  ChevronRight
+  ChevronRight,
+  BarChart3
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -43,6 +44,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     { href: "/jadwal-pelajaran", label: "Jadwal Pelajaran", icon: CalendarCheck },
     { href: "/nilai", label: "Daftar Nilai", icon: Award },
     { href: "/academic-files", label: "Dokumen Akademik", icon: FileText },
+    // 👉 MENU ALUMNI DITAMBAHKAN DI SINI
+    { href: "/alumni", label: "Alumni & Statistik", icon: BarChart3 },
     { href: "/school-info", label: "Informasi Sekolah", icon: Megaphone },
     { href: "/tuition-fees", label: "Keuangan & SPP", icon: Wallet },
     { href: "/counseling", label: "Bimbingan Konseling", icon: HeartHandshake },
@@ -244,7 +247,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
               <div className={`border-t ${sidebarPanelClass} pt-4 mt-auto`}>
                 <div className={`mb-4 rounded-lg border ${sidebarPanelStrongClass} p-3`}>
                   <p className="truncate text-xs font-extrabold text-slate-900 dark:text-white">{userData?.displayName || user?.email}</p>
-                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider border ${getRoleBadgeColor()} mt-1`}>
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider border ${getRoleBadgeClient()} mt-1`}>
                     {getRoleLabel()}
                   </span>
                 </div>
